@@ -1,0 +1,9 @@
+mobilefacenet.tflite
+
+Converted from the frozen graph MobileFaceNet_9925_9680.pb published in
+https://github.com/sirius-ai/MobileFaceNet_TF (Apache License 2.0), using
+TensorFlow 2.20's TFLiteConverter with input `img_inputs` [1,112,112,3]
+(float32, normalised as (pixel - 127.5) / 128) and output `embeddings`
+[1,128] (L2-normalised face embedding).
+
+The original license text is reproduced in LICENSE-MobileFaceNet_TF.txt.
