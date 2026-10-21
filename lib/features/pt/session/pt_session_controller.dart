@@ -19,6 +19,10 @@ import '../../../services/pose_detection_service.dart';
 import '../../../services/voice_coach.dart';
 import '../../workout/analysis/coaching_tracker.dart';
 import '../../workout/analysis/exercise_analyzer.dart';
+import '../../strength/logic/records.dart';
+import '../../strength/models/lift_log.dart';
+import '../models/movement_library.dart';
+import '../../strength/strength_providers.dart';
 import '../../workout/analysis/generic_analyzers.dart';
 import '../models/movement.dart';
 import '../models/pt_record.dart';
@@ -65,6 +69,10 @@ class PtSessionState {
     this.saveFailed = false,
     this.lensDirection = CameraLensDirection.front,
     this.autoStartIn = 0,
+    this.loadKg,
+    this.setReps = const [],
+    this.liftsSaved = const [],
+    this.personalRecords = const [],
   });
 
   final WorkoutPlan plan;
@@ -107,6 +115,19 @@ class PtSessionState {
   /// Quick workouts: seconds until the intro starts the item by itself
   /// (0 = no auto-start).
   final int autoStartIn;
+
+  /// Working load for the current item (kg), when the user set one.
+  final double? loadKg;
+
+  /// Reps (seconds for timed items) of each finished set of the current
+  /// item.
+  final List<int> setReps;
+
+  /// Lift-log entries written when the session finished.
+  final List<LiftEntry> liftsSaved;
+
+  /// Records set in this session (heaviest set, most reps, best e1RM…).
+  final List<PersonalRecord> personalRecords;
 
   List<PlanItem> get items => plan.all;
   PlanItem get item => items[index];
@@ -151,6 +172,11 @@ class PtSessionState {
     bool? saveFailed,
     CameraLensDirection? lensDirection,
     int? autoStartIn,
+    double? loadKg,
+    bool clearLoad = false,
+    List<int>? setReps,
+    List<LiftEntry>? liftsSaved,
+    List<PersonalRecord>? personalRecords,
   }) => PtSessionState(
     plan: plan ?? this.plan,
     index: index ?? this.index,
@@ -182,6 +208,10 @@ class PtSessionState {
     saveFailed: saveFailed ?? this.saveFailed,
     lensDirection: lensDirection ?? this.lensDirection,
     autoStartIn: autoStartIn ?? this.autoStartIn,
+    loadKg: clearLoad ? null : (loadKg ?? this.loadKg),
+    setReps: setReps ?? this.setReps,
+    liftsSaved: liftsSaved ?? this.liftsSaved,
+    personalRecords: personalRecords ?? this.personalRecords,
   );
 }
 
@@ -208,7 +238,7 @@ class PtSessionController extends Notifier<PtSessionState> {
   @override
   PtSessionState build() {
     ref.onDispose(_teardown);
-    final plan = ref.read(ptPlanProvider);
+    final plan = ref.read(annotatedPlanProvider);
     if (plan == null || plan.all.isEmpty) {
       return PtSessionState(
         plan: const WorkoutPlan(
@@ -227,6 +257,7 @@ class PtSessionController extends Notifier<PtSessionState> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     return PtSessionState(
       plan: plan,
+      loadKg: plan.all.first.suggestedKg,
       autoStartIn: plan.request.quick ? _autoStartSeconds : 0,
       coachLine: CoachVoice.beforeItem(plan.all.first, first: true),
       lensDirection: settings.cameraFacing == CameraFacing.back
@@ -269,6 +300,12 @@ class PtSessionController extends Notifier<PtSessionState> {
     }
     if (_elapsedBase == null) return;
     state = state.copyWith(elapsed: _activeElapsed);
+  }
+
+  /// Sets the working load (kg) for the current item; null clears it.
+  void setLoad(double? kg) {
+    if (state.step == PtStep.finished) return;
+    state = state.copyWith(loadKg: kg, clearLoad: kg == null);
   }
 
   /// Skips the one identity check. The session is coached but not scored.
@@ -390,6 +427,10 @@ class PtSessionController extends Notifier<PtSessionState> {
     }
     final reps = state.itemReps + (item.isTimed ? 0 : state.repsInSet);
     final seconds = state.itemSeconds + (item.isTimed ? _setSeconds(item) : 0);
+    final setReps = [
+      ...state.setReps,
+      item.isTimed ? _setSeconds(item) : state.repsInSet,
+    ];
     _setTimer?.cancel();
     final line = CoachVoice.afterSet(
       item: item,
@@ -403,6 +444,7 @@ class PtSessionController extends Notifier<PtSessionState> {
         itemReps: reps,
         itemSeconds: seconds,
         itemMistakes: mistakes,
+        setReps: setReps,
         restRemaining: item.rest.inSeconds,
         coachLine: line,
         clearCoachCue: true,
@@ -426,6 +468,7 @@ class PtSessionController extends Notifier<PtSessionState> {
         itemReps: reps,
         itemSeconds: seconds,
         itemMistakes: mistakes,
+        setReps: setReps,
       );
       _say(line);
       _itemDone(skipped: false);
@@ -485,9 +528,11 @@ class PtSessionController extends Notifier<PtSessionState> {
     if (state.step != PtStep.intro) return false;
     final notifier = ref.read(ptPlanProvider.notifier);
     if (!notifier.swap(state.item)) return false;
-    final plan = ref.read(ptPlanProvider)!;
+    final plan = ref.read(annotatedPlanProvider)!;
     state = state.copyWith(
       plan: plan,
+      loadKg: plan.all[state.index].suggestedKg,
+      clearLoad: plan.all[state.index].suggestedKg == null,
       coachLine: CoachVoice.beforeItem(plan.all[state.index], first: false),
     );
     return true;
@@ -509,6 +554,8 @@ class PtSessionController extends Notifier<PtSessionState> {
       seconds: state.itemSeconds,
       skipped: skipped,
       mistakes: state.itemMistakes,
+      weightKg: state.loadKg,
+      setReps: state.setReps,
     );
     final results = [...state.results, result];
     if (state.isLast) {
@@ -529,6 +576,9 @@ class PtSessionController extends Notifier<PtSessionState> {
       itemReps: 0,
       itemSeconds: 0,
       itemMistakes: const {},
+      setReps: const [],
+      loadKg: next.suggestedKg,
+      clearLoad: next.suggestedKg == null,
       coachLine: line,
       clearCoachCue: true,
       clearPose: true,
@@ -590,6 +640,8 @@ class PtSessionController extends Notifier<PtSessionState> {
               (inSet && item.isTimed ? _setSeconds(item) : 0),
           skipped: false,
           mistakes: mistakes,
+          weightKg: state.loadKg,
+          setReps: state.setReps,
         ),
       );
     }
@@ -607,6 +659,8 @@ class PtSessionController extends Notifier<PtSessionState> {
       verified: state.verified,
       plannedItems: state.items.length,
       activeSeconds: activeSeconds,
+      routineId: state.plan.request.routineId,
+      routineDayId: state.plan.request.routineDayId,
     );
     var saveFailed = false;
     try {
@@ -615,21 +669,75 @@ class PtSessionController extends Notifier<PtSessionState> {
       debugPrint('Saving PT record failed: $e');
       saveFailed = true;
     }
-    final line = saveFailed
+    // Every main-phase set goes to the lift log so the library can chart
+    // it and the progression rule can read it next time.
+    final lifts = _liftEntries(record);
+    final prs = <PersonalRecord>[];
+    if (lifts.isNotEmpty) {
+      try {
+        await ref.read(liftLogProvider.notifier).addAll(lifts);
+        final all = ref.read(liftLogProvider);
+        for (final e in lifts) {
+          prs.addAll(RecordBook.detect(e, all));
+        }
+      } catch (e) {
+        debugPrint('Saving lift log failed: $e');
+      }
+    }
+    var line = saveFailed
         ? '${CoachVoice.summary(record)} I could not save this session, so it '
               'will not count toward your level.'
         : CoachVoice.summary(record);
+    if (prs.isNotEmpty) {
+      final names = {
+        for (final p in prs) MovementLibrary.byId(p.movementId)?.name,
+      }.whereType<String>().take(2).join(' and ');
+      line += ' New personal record${prs.length > 1 ? 's' : ''} on $names!';
+    }
     if (_disposed) return;
     state = state.copyWith(
       step: PtStep.finished,
       results: results,
       record: record,
       saveFailed: saveFailed,
+      liftsSaved: lifts,
+      personalRecords: prs,
       coachLine: line,
       clearPose: true,
       clearCoachCue: true,
     );
     _say(line);
+  }
+
+  List<LiftEntry> _liftEntries(PtRecord record) {
+    final out = <LiftEntry>[];
+    for (final r in record.items) {
+      final m = r.movement;
+      if (m == null || r.phase != PlanPhase.main || r.setReps.isEmpty) {
+        continue;
+      }
+      final sets = [
+        for (final n in r.setReps)
+          if (n > 0)
+            LiftSet(
+              weightKg: r.weightKg ?? 0,
+              reps: m.isTimed ? 0 : n,
+              seconds: m.isTimed ? n : null,
+            ),
+      ];
+      if (sets.isEmpty) continue;
+      out.add(
+        LiftEntry(
+          id: _uuid.v4(),
+          movementId: m.id,
+          startTime: record.startTime,
+          sets: sets,
+          source: LiftSource.pt,
+          sessionId: record.id,
+        ),
+      );
+    }
+    return out;
   }
 
   // ---------------------------------------------------------------------------

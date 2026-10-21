@@ -72,6 +72,30 @@ enum PtLevel {
       values.firstWhere((l) => l.name == name, orElse: () => intermediate);
 }
 
+/// An exercise a routine fixes for the main phase.
+class FixedItem {
+  const FixedItem({
+    required this.movementId,
+    required this.sets,
+    required this.reps,
+    this.repsMin,
+    this.seconds,
+    this.policy,
+  });
+
+  final String movementId;
+  final int sets;
+
+  /// Target reps per set (top of the range when [repsMin] is set).
+  final int reps;
+  final int? repsMin;
+  final int? seconds;
+
+  /// Progression policy name chosen in the routine (overrides the saved
+  /// rule for this exercise), or null.
+  final String? policy;
+}
+
 /// What the user asked for.
 class PtRequest {
   const PtRequest({
@@ -82,6 +106,10 @@ class PtRequest {
     this.equipment = const {},
     this.seed = 1,
     this.quick = false,
+    this.fixed = const [],
+    this.routineId,
+    this.routineDayId,
+    this.title,
   });
 
   final Duration duration;
@@ -98,6 +126,17 @@ class PtRequest {
   /// One-tap quick workout: intros auto-start after a short countdown.
   final bool quick;
 
+  /// Main-phase exercises prescribed by a routine day; the planner wraps
+  /// them with a warm-up and cool-down instead of choosing its own.
+  final List<FixedItem> fixed;
+  final String? routineId;
+  final String? routineDayId;
+
+  /// Routine day name shown instead of the mode label.
+  final String? title;
+
+  bool get fromRoutine => fixed.isNotEmpty;
+
   Set<MuscleGroup> get targetMuscles =>
       mode == WorkoutMode.custom ? focus : mode.muscles;
 
@@ -109,6 +148,10 @@ class PtRequest {
     Set<Equipment>? equipment,
     int? seed,
     bool? quick,
+    List<FixedItem>? fixed,
+    String? routineId,
+    String? routineDayId,
+    String? title,
   }) => PtRequest(
     duration: duration ?? this.duration,
     mode: mode ?? this.mode,
@@ -117,6 +160,10 @@ class PtRequest {
     equipment: equipment ?? this.equipment,
     seed: seed ?? this.seed,
     quick: quick ?? this.quick,
+    fixed: fixed ?? this.fixed,
+    routineId: routineId ?? this.routineId,
+    routineDayId: routineDayId ?? this.routineDayId,
+    title: title ?? this.title,
   );
 }
 
@@ -130,11 +177,21 @@ class PlanItem {
     required this.seconds,
     required this.rest,
     required this.equipment,
+    this.repsMin,
+    this.suggestedKg,
+    this.suggestionWhy,
   });
 
   final Movement movement;
   final PlanPhase phase;
   final int sets;
+
+  /// Bottom of a rep range (double progression); null for a fixed count.
+  final int? repsMin;
+
+  /// Load the progression rule suggests, with its one-line reason.
+  final double? suggestedKg;
+  final String? suggestionWhy;
 
   /// Reps per set (rep movements).
   final int reps;
@@ -148,6 +205,9 @@ class PlanItem {
 
   bool get isTimed => movement.isTimed;
 
+  /// Whether the user lifts a measurable load for this item.
+  bool get loaded => movement.loadedWith(equipment);
+
   /// Seconds of work in one set.
   double get workSecondsPerSet =>
       isTimed ? seconds.toDouble() : reps * movement.secondsPerRep;
@@ -157,20 +217,36 @@ class PlanItem {
     seconds: (sets * workSecondsPerSet + (sets - 1) * rest.inSeconds).round(),
   );
 
+  String get repLabel =>
+      repsMin != null && repsMin != reps ? '$repsMin–$reps' : '$reps';
+
   String get prescription => isTimed
       ? (sets == 1 ? '${seconds}s' : '$sets × ${seconds}s')
-      : (sets == 1 ? '$reps reps' : '$sets × $reps');
+      : (sets == 1 ? '$repLabel reps' : '$sets × $repLabel');
 
-  PlanItem copyWith({Movement? movement, int? sets, int? reps, int? seconds}) =>
-      PlanItem(
-        movement: movement ?? this.movement,
-        phase: phase,
-        sets: sets ?? this.sets,
-        reps: reps ?? this.reps,
-        seconds: seconds ?? this.seconds,
-        rest: rest,
-        equipment: equipment,
-      );
+  PlanItem copyWith({
+    Movement? movement,
+    int? sets,
+    int? reps,
+    int? seconds,
+    int? repsMin,
+    double? suggestedKg,
+    String? suggestionWhy,
+    bool clearSuggestion = false,
+  }) => PlanItem(
+    movement: movement ?? this.movement,
+    phase: phase,
+    sets: sets ?? this.sets,
+    reps: reps ?? this.reps,
+    seconds: seconds ?? this.seconds,
+    rest: rest,
+    equipment: equipment,
+    repsMin: repsMin ?? this.repsMin,
+    suggestedKg: clearSuggestion ? null : (suggestedKg ?? this.suggestedKg),
+    suggestionWhy: clearSuggestion
+        ? null
+        : (suggestionWhy ?? this.suggestionWhy),
+  );
 }
 
 /// A complete session.
@@ -192,6 +268,18 @@ class WorkoutPlan {
   final String rationale;
 
   List<PlanItem> get all => [...warmUp, ...main, ...coolDown];
+
+  /// Routine day name, or the mode label.
+  String get title => request.title ?? request.mode.label;
+
+  /// Same plan with [main] replaced (used when loads are annotated).
+  WorkoutPlan withMain(List<PlanItem> items) => WorkoutPlan(
+    request: request,
+    warmUp: warmUp,
+    main: items,
+    coolDown: coolDown,
+    rationale: rationale,
+  );
 
   List<PlanItem> items(PlanPhase phase) => switch (phase) {
     PlanPhase.warmUp => warmUp,

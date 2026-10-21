@@ -21,8 +21,13 @@ import '../../workout/widgets/camera_preview_fill.dart';
 import '../../workout/widgets/coach_card.dart';
 import '../../workout/widgets/pose_painter.dart';
 import '../mannequin/mannequin_3d.dart';
+import '../../strength/models/progression_rule.dart';
+import '../../strength/strength_providers.dart';
+import '../../strength/widgets/load_stepper.dart';
+import '../../strength/widgets/plate_sheet.dart';
 import '../models/equipment.dart';
 import '../models/movement.dart';
+import '../models/movement_library.dart';
 import '../models/workout_plan.dart';
 import '../planner/coach_voice.dart';
 import '../pt_providers.dart';
@@ -291,6 +296,40 @@ class _IntroView extends ConsumerWidget {
                             ],
                           ),
                         ),
+                        if (item.loaded) ...[
+                          const SizedBox(height: 14),
+                          AppCard(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            child: LoadStepper(
+                              valueKg: state.loadKg,
+                              unit: ref.watch(weightUnitProvider),
+                              stepKg: ProgressionRule.incrementFor(
+                                item.equipment,
+                              ),
+                              suggestedKg: item.suggestedKg,
+                              why: item.suggestionWhy,
+                              label:
+                                  item.equipment.contains(Equipment.dumbbells)
+                                  ? 'Load per dumbbell'
+                                  : 'Load',
+                              onChanged: controller.setLoad,
+                              trailing:
+                                  item.equipment.contains(Equipment.barbell)
+                                  ? TextButton.icon(
+                                      onPressed: () => showPlateSheet(
+                                        context,
+                                        targetKg: state.loadKg ?? 20,
+                                      ),
+                                      icon: const Icon(
+                                        Icons.album_outlined,
+                                        size: 18,
+                                      ),
+                                      label: const Text('Plates'),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ],
                         if (item.equipment.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           _EquipmentGuide(item: item, profile: profile),
@@ -729,7 +768,8 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                           ],
                         ),
                         Text(
-                          'SET ${state.setIndex + 1} OF ${item.sets}',
+                          'SET ${state.setIndex + 1} OF ${item.sets}'
+                          '${state.loadKg != null && state.loadKg! > 0 ? ' · ${ref.watch(weightUnitProvider).format(state.loadKg!)}' : ''}',
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: AppColors.primary,
                             letterSpacing: 1.4,
@@ -1391,6 +1431,48 @@ class _SummaryView extends ConsumerWidget {
                                 ],
                               ),
                             ),
+                            if (state.personalRecords.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              const SectionHeader('New records'),
+                              AppCard(
+                                borderColor: AppColors.warning.withValues(
+                                  alpha: 0.6,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Column(
+                                  children: [
+                                    for (final pr in state.personalRecords)
+                                      ListTile(
+                                        dense: true,
+                                        leading: const Icon(
+                                          Icons.emoji_events_rounded,
+                                          color: AppColors.warning,
+                                        ),
+                                        title: Text(
+                                          MovementLibrary.byId(pr.movementId)
+                                                  ?.name ??
+                                              pr.movementId,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                        subtitle: Text(pr.kind.label),
+                                        trailing: Text(
+                                          pr.label,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             if (record != null) ...[
                               const SizedBox(height: 20),
                               const SectionHeader('Next time'),

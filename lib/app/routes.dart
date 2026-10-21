@@ -15,6 +15,13 @@ import '../features/pt/screens/pt_home_screen.dart';
 import '../features/pt/screens/pt_session_screen.dart';
 import '../features/settings/privacy_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/strength/models/routine.dart';
+import '../features/strength/screens/body_screen.dart';
+import '../features/strength/screens/library_screen.dart';
+import '../features/strength/screens/movement_detail_screen.dart';
+import '../features/strength/screens/progress_screen.dart';
+import '../features/strength/screens/routine_edit_screen.dart';
+import '../features/strength/screens/routines_screen.dart';
 import '../features/workout/workout_camera_screen.dart';
 import '../features/workout/workout_complete_screen.dart';
 import '../features/workout/workout_controller.dart' show WorkoutOutcome;
@@ -39,6 +46,14 @@ abstract final class Routes {
   static const ptSession = '/pt/session';
   static const challenge = '/challenge';
   static const challengePlay = '/challenge/play';
+  static const library = '/library';
+  static const libraryPick = '/library/pick';
+  static String movement(String id) =>
+      '/library/movement/${Uri.encodeComponent(id)}';
+  static const body = '/body';
+  static const progress = '/progress';
+  static const routines = '/routines';
+  static const routineEdit = '/routines/edit';
 }
 
 /// Where the app opens. Overridden at startup when a reminder launched it.
@@ -161,6 +176,49 @@ final routerProvider = Provider<GoRouter>((ref) {
               child: const PtSessionScreen(),
               transitionsBuilder: (context, animation, secondary, child) =>
                   FadeTransition(opacity: animation, child: child),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: Routes.library,
+        pageBuilder: (context, state) => _page(state, const LibraryScreen()),
+        routes: [
+          GoRoute(
+            path: 'pick',
+            pageBuilder: (context, state) =>
+                _page(state, const LibraryScreen(pickMode: true)),
+          ),
+          GoRoute(
+            path: 'movement/:id',
+            pageBuilder: (context, state) => _page(
+              state,
+              MovementDetailScreen(
+                movementId: Uri.decodeComponent(
+                  state.pathParameters['id'] ?? '',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: Routes.body,
+        pageBuilder: (context, state) => _page(state, const BodyScreen()),
+      ),
+      GoRoute(
+        path: Routes.progress,
+        pageBuilder: (context, state) => _page(state, const ProgressScreen()),
+      ),
+      GoRoute(
+        path: Routes.routines,
+        pageBuilder: (context, state) => _page(state, const RoutinesScreen()),
+        routes: [
+          GoRoute(
+            path: 'edit',
+            pageBuilder: (context, state) => _page(
+              state,
+              RoutineEditScreen(routine: state.extra as Routine?),
             ),
           ),
         ],

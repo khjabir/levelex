@@ -20,6 +20,10 @@ import '../../widgets/section_header.dart';
 import '../notifications/reminder_controller.dart';
 import '../pt/models/workout_plan.dart';
 import '../pt/pt_providers.dart';
+import '../strength/logic/routine_launcher.dart';
+import '../strength/logic/routine_schedule.dart';
+import '../strength/models/routine.dart';
+import '../strength/strength_providers.dart';
 import '../workout/exercise_icons.dart';
 import '../pt/mannequin/mannequin_3d.dart';
 
@@ -69,6 +73,13 @@ class HomeScreen extends ConsumerWidget {
                     _LevelCard(level: level, streak: streak),
                     const SizedBox(height: 14),
                     _MyPtCard(onTap: () => context.push(Routes.pt)),
+                    if (ref.watch(activeRoutineProvider) != null) ...[
+                      const SizedBox(height: 10),
+                      _TodayCard(
+                        routine: ref.watch(activeRoutineProvider)!,
+                        day: ref.watch(todayRoutineDayProvider),
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -104,6 +115,37 @@ class HomeScreen extends ConsumerWidget {
                             subtitle: 'Friends, one cup',
                             color: AppColors.warning,
                             onTap: () => context.push(Routes.challenge),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _MiniTile(
+                            icon: Icons.menu_book_rounded,
+                            title: 'Library',
+                            color: AppColors.cyan,
+                            onTap: () => context.push(Routes.library),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _MiniTile(
+                            icon: Icons.insights_rounded,
+                            title: 'Progress',
+                            color: AppColors.primary,
+                            onTap: () => context.push(Routes.progress),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _MiniTile(
+                            icon: Icons.monitor_weight_outlined,
+                            title: 'Body',
+                            color: AppColors.secondary,
+                            onTap: () => context.push(Routes.body),
                           ),
                         ),
                       ],
@@ -202,6 +244,124 @@ class HomeScreen extends ConsumerWidget {
                   .fadeIn(duration: 320.ms)
                   .slideY(begin: 0.06, end: 0, curve: AppTokens.curve),
         ),
+      ),
+    );
+  }
+}
+
+/// Compact entry tile: icon over a one-word title.
+class _MiniTile extends StatelessWidget {
+  const _MiniTile({
+    required this.icon,
+    required this.title,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the active routine asks for today.
+class _TodayCard extends ConsumerWidget {
+  const _TodayCard({required this.routine, required this.day});
+
+  final Routine routine;
+  final RoutineDay? day;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final next = day == null
+        ? RoutineScheduler.nextTrainingDate(
+            routine,
+            DateTime.now().add(const Duration(days: 1)),
+          )
+        : null;
+    return AppCard(
+      onTap: () => day == null
+          ? context.push(Routes.routines)
+          : startRoutineDay(context, ref, routine, day!),
+      padding: const EdgeInsets.all(16),
+      borderColor: day == null
+          ? null
+          : AppColors.primary.withValues(alpha: 0.4),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: (day == null ? AppColors.textMuted : AppColors.primary)
+                  .withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              day == null ? Icons.bedtime_outlined : Icons.today_rounded,
+              color: day == null ? AppColors.textSecondary : AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  day == null ? 'Rest day' : 'Today: ${day!.name}',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  day == null
+                      ? '${routine.name}'
+                            '${next == null ? '' : ' · next ${DateFormat.EEEE().format(next)}'}'
+                      : '${routine.name} · ${day!.exercises.length} exercises · ${day!.minutes} min',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            day == null
+                ? Icons.chevron_right_rounded
+                : Icons.play_arrow_rounded,
+            color: day == null ? AppColors.textMuted : AppColors.primary,
+          ),
+        ],
       ),
     );
   }

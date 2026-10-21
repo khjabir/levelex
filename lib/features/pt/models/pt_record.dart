@@ -14,6 +14,8 @@ class PtItemResult {
     required this.seconds,
     required this.skipped,
     this.mistakes = const {},
+    this.weightKg,
+    this.setReps = const [],
   });
 
   final String movementId;
@@ -29,6 +31,12 @@ class PtItemResult {
   final bool skipped;
   final Map<FormStatus, int> mistakes;
 
+  /// Load used for every set (kg), when the user set one.
+  final double? weightKg;
+
+  /// Reps (or seconds for timed items) of each finished set, in order.
+  final List<int> setReps;
+
   Movement? get movement => MovementLibrary.byId(movementId);
 
   bool get completed => !skipped && setsDone >= setsPlanned;
@@ -42,6 +50,8 @@ class PtItemResult {
     'seconds': seconds,
     'skipped': skipped,
     'mistakes': {for (final e in mistakes.entries) e.key.name: e.value},
+    if (weightKg != null) 'weightKg': weightKg,
+    if (setReps.isNotEmpty) 'setReps': setReps,
   };
 
   factory PtItemResult.fromMap(Map<dynamic, dynamic> map) => PtItemResult(
@@ -63,6 +73,11 @@ class PtItemResult {
       },
       _ => const {},
     },
+    weightKg: (map['weightKg'] as num?)?.toDouble(),
+    setReps: [
+      for (final r in (map['setReps'] as List? ?? const []))
+        if (r is num) r.toInt(),
+    ],
   );
 }
 
@@ -78,6 +93,8 @@ class PtRecord {
     required this.verified,
     this.plannedItems = 0,
     this.activeSeconds,
+    this.routineId,
+    this.routineDayId,
   });
 
   final String id;
@@ -97,6 +114,10 @@ class PtRecord {
 
   /// Time spent exercising, excluding pauses. Null on older records.
   final int? activeSeconds;
+
+  /// The routine day this session performed, when started from a routine.
+  final String? routineId;
+  final String? routineDayId;
 
   Duration get duration => activeSeconds != null
       ? Duration(seconds: activeSeconds!)
@@ -128,6 +149,8 @@ class PtRecord {
     'verified': verified,
     'plannedItems': plannedItems,
     if (activeSeconds != null) 'activeSeconds': activeSeconds,
+    if (routineId != null) 'routineId': routineId,
+    if (routineDayId != null) 'routineDayId': routineDayId,
   };
 
   factory PtRecord.fromMap(Map<dynamic, dynamic> map) => PtRecord(
@@ -143,5 +166,7 @@ class PtRecord {
     verified: (map['verified'] as bool?) ?? false,
     plannedItems: (map['plannedItems'] as int?) ?? 0,
     activeSeconds: map['activeSeconds'] as int?,
+    routineId: map['routineId'] as String?,
+    routineDayId: map['routineDayId'] as String?,
   );
 }

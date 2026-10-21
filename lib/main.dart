@@ -8,6 +8,7 @@ import 'app/providers.dart';
 import 'app/routes.dart';
 import 'features/challenge/challenge_providers.dart';
 import 'features/pt/pt_providers.dart';
+import 'features/strength/strength_providers.dart';
 import 'services/notification_service.dart';
 import 'services/storage_service.dart';
 
@@ -36,6 +37,7 @@ Future<void> main() async {
       sessionRepositoryProvider.overrideWithValue(storage.sessions),
       ptRepositoryProvider.overrideWithValue(storage.pt),
       challengeRepositoryProvider.overrideWithValue(storage.challenges),
+      strengthRepositoryProvider.overrideWithValue(storage.strength),
       notificationServiceProvider.overrideWithValue(notifications),
       initialLocationProvider.overrideWithValue(
         launchedFromReminder && storage.settings.settings.onboardingCompleted

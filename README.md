@@ -129,6 +129,65 @@ works offline and nothing about you leaves the phone.
   rest down, and ends with a summary and a tip for next time; all spoken by
   the voice coach.
 
+## Strength tracking, programmes and progress
+
+Inspired by the open-source [openGym](https://github.com/DuarteSantos8/openGym)
+tracker, Levelex also keeps a proper training log around the camera coach.
+Everything is reimplemented in Dart and stays on the phone (no account, no
+server); the code lives in `lib/features/strength/`.
+
+- **Lift log**: every main-phase set of a MY PT session is written to the log
+  (`LiftEntry` / `LiftSet`: load in kg, reps or seconds, warm-up flag,
+  optional RPE). Loaded movements get a load stepper on the intro card
+  (with a plate calculator for barbell work) so the weight is captured per
+  item; any exercise can also be logged by hand from the library. Loads are
+  stored in kg and shown in kg or lb (Settings → Lifting).
+- **Progression rules** (`ProgressionEngine`): per exercise, choose Linear,
+  Greyskull LP, Double progression, Triple progression, Timed or Off. The
+  next prescription is derived from the log every time it is needed (nothing
+  is stored and nothing can drift): hit every set and the load goes up,
+  missed reps never add load, repeated stalls trigger a deload, and the
+  reason is always shown in one sentence ("All 3 sets hit 12 at 20 kg last
+  time, so add 2.5 kg"). `PlanAdvisor` writes the suggestion and rep target
+  onto the MY PT plan; the plan preview and the intro card show it.
+- **Records and 1RM**: `RecordBook` detects personal records (heaviest set,
+  most reps at a weight, best estimated 1RM, most volume) the moment a
+  session is saved; the summary lists them and the trainer announces them.
+  `OneRm` offers Epley, Brzycki, Lombardi, O'Conner, Mayhew, Wathan and
+  Lander, capped at 12 reps because higher rep counts say more about work
+  capacity than strength.
+- **Exercise library**: browse every movement by muscle, equipment, "my
+  gym" and "logged", with the 3D guide, cues, history chart (estimated 1RM
+  or best set), records, the next prescription and the progression rule
+  editor.
+- **Programmes** (`Routine`): weekly plans on fixed weekdays or an A/B/C
+  rotation. Starter templates (Push/Pull/Legs, Upper/Lower, Full Body, 5×5)
+  are fitted to your equipment (`StarterPlans`: missing gear is substituted
+  by the closest movement for the same muscles, or dropped). The home
+  screen shows today's day (or the rest day and the next one) and starts it
+  as a MY PT session: the routine's exercises form the main block, wrapped
+  in the planner's warm-up and cool-down, with camera coaching and loads.
+- **Progress**: a 26-week activity heatmap, a muscle recovery map
+  (`MuscleRecovery`: hard sets per muscle decayed with a 24–48 h half-life,
+  so you can see what is worked, recovering or fresh), recent records and
+  weekly volume.
+- **Body**: weigh-ins with a goal line, weekly means and trend, plus
+  progress photos with a before/after slider. Photos stay in the app's
+  private folder.
+- **Data & backup** (Settings): export one JSON backup (sets, MY PT sessions,
+  lifts, weigh-ins, routines, rules, challenges, equipment list; never face
+  data or photos) through the share sheet and merge it back on any phone;
+  import workout history from FitNotes, Strong or Hevy CSV exports (or any
+  CSV with a date, an exercise and reps/weight) and body weight from an
+  Apple Health export. Imports are idempotent: re-importing the same file
+  never duplicates anything, and unknown exercise names are kept as your
+  own exercises.
+
+Not carried over from openGym: accounts, passkeys and multi-device sync (Levelex
+is single-device and offline), the cloud AI coach and MCP server, the licensed
+exercise GIF library (the 3D mannequin stands in), and structural-balance
+ratios.
+
 ## Tech stack
 
 | Concern | Package |

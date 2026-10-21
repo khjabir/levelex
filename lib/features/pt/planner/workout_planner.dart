@@ -40,7 +40,9 @@ class WorkoutPlanner {
       maxItems: 8,
       seconds: 45,
     );
-    var main = request.mode == WorkoutMode.hiit
+    var main = request.fromRoutine
+        ? _fixedWork(request)
+        : request.mode == WorkoutMode.hiit
         ? _hiit(request, rng, mainBudget)
         : request.mode == WorkoutMode.mobility
         ? stretches()
@@ -215,6 +217,37 @@ class WorkoutPlanner {
         used += cost;
       }
       covered.addAll(pick.primary);
+    }
+    return items;
+  }
+
+  /// A routine day's exercises, in order, with the level's rest. Movements
+  /// the library no longer knows are dropped; ones the gym cannot do are
+  /// kept (the user chose them) with whatever equipment option comes first.
+  List<PlanItem> _fixedWork(PtRequest request) {
+    final items = <PlanItem>[];
+    for (final f in request.fixed) {
+      final m = MovementLibrary.byId(f.movementId);
+      if (m == null) continue;
+      final equipment =
+          m.equipmentFor(request.equipment) ??
+          (m.equipmentOptions.isEmpty
+              ? const <Equipment>{}
+              : m.equipmentOptions.first);
+      items.add(
+        PlanItem(
+          movement: m,
+          phase: PlanPhase.main,
+          sets: f.sets,
+          reps: m.isTimed ? 0 : f.reps,
+          seconds: f.seconds ?? m.baseSeconds,
+          rest: m.compound && m.loadedWith(equipment)
+              ? request.level.rest + const Duration(seconds: 45)
+              : request.level.rest,
+          equipment: equipment,
+          repsMin: f.repsMin,
+        ),
+      );
     }
     return items;
   }

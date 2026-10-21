@@ -16,6 +16,7 @@ import '../face/face_providers.dart';
 import '../notifications/reminder_controller.dart';
 import '../challenge/challenge_providers.dart';
 import '../pt/pt_providers.dart';
+import '../strength/data/backup_actions.dart';
 import '../workout/exercise_icons.dart';
 import '../workout/workout_intro_screen.dart';
 import 'widgets/settings_widgets.dart';
@@ -50,6 +51,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final after = ref.read(settingsProvider);
     if (ReminderController.affectsSchedule(before, after)) {
       await ref.read(reminderControllerProvider.notifier).reschedule();
+    }
+  }
+
+  void _toast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), duration: const Duration(seconds: 6)),
+      );
+  }
+
+  Future<void> _exportBackup() async {
+    try {
+      await BackupActions.export(ref);
+    } catch (e) {
+      _toast('Export failed: $e');
+    }
+  }
+
+  Future<void> _importBackup() async {
+    try {
+      final text = await BackupActions.pickTextFile();
+      if (text == null) return;
+      final outcome = await BackupActions.importBackup(ref, text);
+      _toast(outcome.message);
+    } on FormatException catch (e) {
+      _toast(e.message);
+    } catch (e) {
+      _toast('Import failed: $e');
+    }
+  }
+
+  Future<void> _importOtherApp() async {
+    try {
+      final text = await BackupActions.pickTextFile();
+      if (text == null) return;
+      final outcome = await BackupActions.importFromOtherApp(ref, text);
+      if (!mounted) return;
+      if (outcome.unmatched.isEmpty) {
+        _toast(outcome.message);
+        return;
+      }
+      final names = outcome.unmatched.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Imported'),
+          content: SingleChildScrollView(
+            child: Text(
+              '${outcome.message}\n\nKept as your own exercises:\n'
+              '${names.take(25).map((e) => '• ${e.key} (${e.value} sets)').join('\n')}'
+              '${names.length > 25 ? '\n…' : ''}',
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      _toast('Import failed: $e');
     }
   }
 
@@ -489,6 +556,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle: const Text('Also erases your score and streak'),
                       onTap: _eraseFaceData,
                     ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const SectionHeader('Lifting'),
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Weight unit',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          'Loads are stored in kg and shown in this unit.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                  SegmentedButton<WeightUnit>(
+                    segments: [
+                      for (final u in WeightUnit.values)
+                        ButtonSegment(value: u, label: Text(u.label)),
+                    ],
+                    selected: {settings.weightUnit},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) =>
+                        _update((x) => x.copyWith(weightUnit: s.first)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const SectionHeader('Data & backup'),
+            AppCard(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.ios_share_rounded),
+                    title: const Text('Export backup'),
+                    subtitle: const Text(
+                      'One JSON file with sets, MY PT sessions, lifts, '
+                      'weigh-ins, routines and challenges. No face data.',
+                    ),
+                    onTap: _exportBackup,
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.restore_rounded),
+                    title: const Text('Import backup'),
+                    subtitle: const Text(
+                      'Merges a Levelex backup into this phone.',
+                    ),
+                    onTap: _importBackup,
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.download_rounded),
+                    title: const Text('Import from another app'),
+                    subtitle: const Text(
+                      'CSV from FitNotes, Strong or Hevy, or an Apple Health '
+                      'export for body weight.',
+                    ),
+                    onTap: _importOtherApp,
+                  ),
                 ],
               ),
             ),

@@ -9,6 +9,7 @@ import '../models/face_template.dart';
 import '../models/user_settings.dart';
 import '../features/challenge/data/challenge_repository.dart';
 import '../features/pt/data/pt_repository.dart';
+import '../features/strength/data/strength_repository.dart';
 import '../models/workout_session.dart';
 
 /// An in-progress set that is persisted so it can be recovered if the app
@@ -313,18 +314,21 @@ class StorageService {
     required this.sessions,
     required this.pt,
     required this.challenges,
+    required this.strength,
   });
 
   final SettingsRepository settings;
   final SessionRepository sessions;
   final PtRepository pt;
   final ChallengeRepository challenges;
+  final StrengthRepository strength;
 
   static Future<StorageService> initialize() async {
     SettingsRepository settingsRepo;
     SessionRepository sessionRepo;
     PtRepository ptRepo;
     ChallengeRepository challengeRepo;
+    StrengthRepository strengthRepo;
     try {
       settingsRepo = await PrefsSettingsRepository.load();
     } catch (e) {
@@ -349,11 +353,18 @@ class StorageService {
       debugPrint('Hive unavailable, using in-memory challenges: $e');
       challengeRepo = InMemoryChallengeRepository();
     }
+    try {
+      strengthRepo = await HiveStrengthRepository.open();
+    } catch (e) {
+      debugPrint('Hive unavailable, using in-memory strength storage: $e');
+      strengthRepo = InMemoryStrengthRepository();
+    }
     return StorageService(
       settings: settingsRepo,
       sessions: sessionRepo,
       pt: ptRepo,
       challenges: challengeRepo,
+      strength: strengthRepo,
     );
   }
 }

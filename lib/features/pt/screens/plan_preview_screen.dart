@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/routes.dart';
 import '../../../app/theme.dart';
+import '../../../models/user_settings.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/primary_button.dart';
 import '../../../widgets/section_header.dart';
@@ -12,6 +13,7 @@ import '../../face/face_providers.dart';
 import '../mannequin/mannequin_3d.dart';
 import '../models/movement.dart';
 import '../models/workout_plan.dart';
+import '../../strength/strength_providers.dart';
 import '../pt_providers.dart';
 import 'pt_widgets.dart';
 
@@ -22,7 +24,7 @@ class PlanPreviewScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final plan = ref.watch(ptPlanProvider);
+    final plan = ref.watch(annotatedPlanProvider);
     final profile = ref.watch(gymProfileProvider);
     final faceRegistered = ref.watch(faceRegisteredProvider);
     if (plan == null) {
@@ -89,6 +91,7 @@ class PlanPreviewScreen extends ConsumerWidget {
                             ),
                             for (final item in plan.items(phase))
                               _PlanItemCard(
+                                unit: ref.watch(weightUnitProvider),
                                 item: item,
                                 profile: profile,
                                 onSwap: () {
@@ -181,11 +184,13 @@ class _PlanItemCard extends StatelessWidget {
     required this.item,
     required this.profile,
     required this.onSwap,
+    required this.unit,
   });
 
   final PlanItem item;
   final dynamic profile;
   final VoidCallback onSwap;
+  final WeightUnit unit;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +231,19 @@ class _PlanItemCard extends StatelessWidget {
                     '${m.tracking.usesCamera ? ' · camera tracked' : ''}',
                     style: theme.textTheme.bodySmall,
                   ),
+                  if (item.suggestedKg != null && item.suggestedKg! > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '${unit.format(item.suggestedKg!)}'
+                        '${item.suggestionWhy != null ? ' · ${item.suggestionWhy}' : ''}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,

@@ -12,6 +12,41 @@ enum CameraFacing {
   String get label => this == front ? 'Front (selfie)' : 'Back';
 }
 
+/// Unit loads are shown in. Everything is stored in kilograms.
+enum WeightUnit {
+  kg('kg', 1.0),
+  lb('lb', 2.2046226218);
+
+  const WeightUnit(this.label, this.perKg);
+
+  final String label;
+
+  /// How many of this unit make one kilogram.
+  final double perKg;
+
+  double fromKg(double kg) => kg * perKg;
+  double toKg(double value) => value / perKg;
+
+  /// The smallest step a stepper should move in this unit, in kg.
+  double get stepKg => this == kg ? 0.5 : toKg(1);
+
+  /// A load formatted in this unit, e.g. "22.5 kg" or "50 lb".
+  String format(double kg, {bool withUnit = true}) {
+    final v = fromKg(kg);
+    final rounded = (v * 100).round() / 100;
+    var text = rounded == rounded.roundToDouble()
+        ? rounded.toStringAsFixed(0)
+        : rounded.toStringAsFixed(
+            rounded * 10 == (rounded * 10).roundToDouble() ? 1 : 2,
+          );
+    if (text == '-0') text = '0';
+    return withUnit ? '$text $label' : text;
+  }
+
+  static WeightUnit fromName(String? name) =>
+      values.firstWhere((u) => u.name == name, orElse: () => kg);
+}
+
 /// All user-configurable preferences. Immutable; use [copyWith] to change.
 class UserSettings {
   const UserSettings({
@@ -40,6 +75,7 @@ class UserSettings {
     this.reminderExercise = ExerciseType.pushUp,
     this.targets = const {},
     this.showTrackingDetails = false,
+    this.weightUnit = WeightUnit.kg,
   });
 
   final int pushUpsPerSession;
@@ -79,6 +115,9 @@ class UserSettings {
   /// Show live tracking numbers on the camera screen.
   final bool showTrackingDetails;
 
+  /// Unit for loads in the lift log and MY PT.
+  final WeightUnit weightUnit;
+
   /// Target for [type].
   int targetFor(ExerciseType type) {
     if (type == ExerciseType.pushUp) return pushUpsPerSession;
@@ -109,6 +148,7 @@ class UserSettings {
     ExerciseType? reminderExercise,
     Map<ExerciseType, int>? targets,
     bool? showTrackingDetails,
+    WeightUnit? weightUnit,
   }) {
     return UserSettings(
       pushUpsPerSession: pushUpsPerSession ?? this.pushUpsPerSession,
@@ -128,6 +168,7 @@ class UserSettings {
       reminderExercise: reminderExercise ?? this.reminderExercise,
       targets: targets ?? this.targets,
       showTrackingDetails: showTrackingDetails ?? this.showTrackingDetails,
+      weightUnit: weightUnit ?? this.weightUnit,
     );
   }
 
@@ -149,6 +190,7 @@ class UserSettings {
     'reminderExercise': reminderExercise.id,
     'targets': {for (final e in targets.entries) e.key.id: e.value},
     'showTrackingDetails': showTrackingDetails,
+    'weightUnit': weightUnit.name,
   };
 
   factory UserSettings.fromMap(Map<String, dynamic> map) {
@@ -206,6 +248,7 @@ class UserSettings {
       },
       showTrackingDetails:
           (map['showTrackingDetails'] as bool?) ?? defaults.showTrackingDetails,
+      weightUnit: WeightUnit.fromName(map['weightUnit'] as String?),
     );
   }
 

@@ -15,6 +15,7 @@ import '../models/muscle_group.dart';
 import '../models/pt_record.dart';
 import '../models/workout_plan.dart';
 import '../planner/coach_voice.dart';
+import '../../strength/strength_providers.dart';
 import '../pt_providers.dart';
 import 'pt_widgets.dart';
 
@@ -166,6 +167,54 @@ class PtHomeScreen extends ConsumerWidget {
                     Text(
                       request.level.description,
                       style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 24),
+                    const SectionHeader('Programmes'),
+                    AppCard(
+                      onTap: () => context.push(Routes.routines),
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.calendar_month_rounded,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  ref.watch(activeRoutineProvider)?.name ??
+                                      'Follow a weekly plan',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                                Text(
+                                  ref.watch(activeRoutineProvider) == null
+                                      ? 'Push/Pull/Legs, Upper/Lower, Full '
+                                            'Body or 5×5, with loads that '
+                                            'climb session by session.'
+                                      : 'Loads progress automatically from '
+                                            'what you log.',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.textMuted,
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 24),
                     const SectionHeader('Your gym'),

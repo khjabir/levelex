@@ -78,5 +78,22 @@ class Movement {
 
   bool canDoWith(Set<Equipment> available) => equipmentFor(available) != null;
 
+  /// Equipment whose load is a number worth logging and progressing.
+  static const loadBearing = {
+    Equipment.dumbbells,
+    Equipment.barbell,
+    Equipment.kettlebell,
+    Equipment.cableMachine,
+    Equipment.medicineBall,
+  };
+
+  /// Whether this movement, done with [equipment], carries a load in kg.
+  bool loadedWith(Set<Equipment> equipment) =>
+      equipment.any(loadBearing.contains);
+
+  /// Whether any option for this movement is a loaded one.
+  bool get canBeLoaded =>
+      equipmentOptions.any((o) => o.any(loadBearing.contains));
+
   Set<MuscleGroup> get muscles => {...primary, ...secondary};
 }
