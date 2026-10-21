@@ -289,6 +289,57 @@ class NotificationService {
         : ReminderScheduleOutcome.inexact;
   }
 
+  /// Schedules the evening "streak at risk" nudge for [today] and [tomorrow]
+  /// (either may be null to skip that day). One-off notifications, so a day
+  /// that is already done gets no nudge.
+  Future<void> scheduleStreakNudge(
+    UserSettings settings, {
+    DateTime? today,
+    DateTime? tomorrow,
+    required int streak,
+  }) async {
+    if (!_initialized) return;
+    await cancelStreakNudge();
+    final details = _details(settings);
+    final exact = Platform.isAndroid ? await canScheduleExact() : true;
+    final mode = exact
+        ? AndroidScheduleMode.exactAllowWhileIdle
+        : AndroidScheduleMode.inexactAllowWhileIdle;
+    final body = streak > 0
+        ? 'Nothing logged yet today. One quick set keeps your '
+              '$streak-day streak alive.'
+        : 'Nothing logged yet today. A quick set now starts a streak.';
+    final slots = [
+      (NotificationConstants.nudgeIdToday, today),
+      (NotificationConstants.nudgeIdTomorrow, tomorrow),
+    ];
+    for (final (id, at) in slots) {
+      if (at == null) continue;
+      try {
+        await _plugin.zonedSchedule(
+          id: id,
+          title: NotificationConstants.title,
+          body: body,
+          scheduledDate: tz.TZDateTime.from(at, tz.local),
+          notificationDetails: details,
+          androidScheduleMode: mode,
+          payload: NotificationConstants.payloadWorkout,
+        );
+      } catch (e) {
+        debugPrint('Scheduling streak nudge $id failed: $e');
+      }
+    }
+  }
+
+  Future<void> cancelStreakNudge() async {
+    try {
+      await _plugin.cancel(id: NotificationConstants.nudgeIdToday);
+      await _plugin.cancel(id: NotificationConstants.nudgeIdTomorrow);
+    } catch (e) {
+      debugPrint('Cancelling streak nudge failed: $e');
+    }
+  }
+
   Future<void> cancelReminders() async {
     try {
       await _plugin.cancelAll();

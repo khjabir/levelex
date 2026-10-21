@@ -11,7 +11,7 @@ import '../../../widgets/app_card.dart';
 import '../../../widgets/celebration.dart';
 import '../../../widgets/primary_button.dart';
 import '../../../widgets/section_header.dart';
-import '../../pt/mannequin/mannequin_3d.dart';
+import '../../pt/figure/guide_3d.dart';
 import '../../workout/exercise_icons.dart';
 import '../../workout/widgets/camera_preview_fill.dart';
 import '../../workout/widgets/coach_card.dart';
@@ -228,7 +228,7 @@ class _UpNextView extends StatelessWidget {
           const SizedBox(height: 24),
           SizedBox(
             height: 180,
-            child: Mannequin3D(clipId: state.config.exercise.clipId),
+            child: Guide3D(clipId: state.config.exercise.clipId),
           ),
           if (state.scores.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -473,7 +473,7 @@ class _RoundView extends ConsumerWidget {
               ),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Mannequin3D(
+            child: Guide3D(
               clipId: exercise.clipId,
               interactive: false,
               compact: true,

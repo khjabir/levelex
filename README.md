@@ -92,16 +92,70 @@ works offline and nothing about you leaves the phone.
   private folder and never leave the phone.
 - **Session length**: presets from 10 to 60 minutes or any custom length from
   5 to 180 minutes.
-- **3D guides**: every movement is demonstrated by a procedural 3D mannequin
-  (`Mannequin3D`, `lib/features/pt/mannequin/`): a forward-kinematics rig
-  driven by joint-angle keyframes, rendered with a perspective projection,
-  lit depth-sorted capsules, a torso plate, hands and feet. Poses are
-  composed with a flat-back hinge helper (`MannequinClips.hinge`) so squats,
-  deadlifts, rows and push-ups show safe mechanics: hips back, chest up,
-  elbows tucked. Drag to orbit, double-tap to reset. No model files, so it
-  stays crisp and tiny. `test/preview/mannequin_preview_test.dart` renders
-  every clip to contact sheets (`MANNEQUIN_PREVIEW=<dir> flutter test
-  test/preview`) for review.
+- **3D guides**: every movement is demonstrated by a realistic rigged human
+  body (`Guide3D`, `lib/features/pt/figure/`). The body is the male
+  realistic figure from Blender Studio's CC0 [Human Base
+  Meshes](https://www.blender.org/download/demo-files/#asset-bundles)
+  bundle (v1.4.1, with its eyes), prepared by `tool/figure/build_figure.py`
+  in Blender: the sculpt's face sets place the joints (shoulders, elbows,
+  wrists, hips, knees and ankles are the boundaries between the limb face
+  sets; the spine has two segments so the trunk bends through the back
+  rather than at one hinge), the mesh is scaled to the rig's hip height,
+  simplified to about 36k triangles, weighted with bone heat to the
+  21-bone armature, and then dressed: the T-shirt neckline, sleeve hems,
+  shirt hem, shorts hems and the hairline are smooth scalar fields whose
+  zero lines are cut into the mesh (so the clothing edges are clean curves,
+  not face-set zigzags) and every face gets a material: `skin`, `hair`,
+  `sclera`, `iris`, `shirt`, `shorts`, a bare muscle (`biceps`, `triceps`,
+  `quads`, `hamstrings`, `calves`) or a muscle under a garment named
+  `<garment>.<muscle>` (`shirt.chest`, `shirt.back`, `shirt.core`,
+  `shirt.shoulders`, `shorts.glutes`, `shorts.quads`, `shorts.hamstrings`)
+  so it can light up through the cloth. Ambient occlusion is baked with
+  Cycles into the red vertex-colour channel and a skin-warmth weight
+  (face, hands, knees, elbows) into the green one; faces no light reaches
+  (the mouth bag, the eye sockets) are deleted. One animation per movement
+  is keyed from the same verified joint poses as the rig
+  (`tool/figure/poses.json`, exported by
+  `test/preview/figure_poses_export_test.dart`). It ships as a 1.6 MB GLB
+  (`assets/figure/athlete.glb`) that the app renders itself: `FigureModel`
+  parses the GLB and does CPU skinning, and `FigurePainter` lights the
+  vertices (key, fill, rim, specular, hemisphere ambient, the baked
+  occlusion and warmth), sorts the triangles far-to-near from a camera on
+  the +z side, and draws them with `Canvas.drawVertices` (no GPU scene
+  library, works on any device, two to three milliseconds of CPU a frame on
+  a laptop, 30 fps in picture-in-picture). The feet are clamped to the
+  floor every frame, a soft pool of light sits under the body and the
+  body's own silhouette is projected along the key light as its shadow.
+  Idle life keeps the figure from looking frozen: breathing through the
+  upper spine, a slow weight shift at the pelvis, a little drift in the
+  arms, and the head turning part of the way toward the camera as you
+  orbit. The muscles a movement trains light up in the brand colour (for
+  cardio drills the helper muscles light up fully, since they are the ones
+  working); form corrections flag the body part in amber. The Lite
+  mannequin shows the same thing by region: the working limbs stay in the
+  brand colour and the rest goes neutral. Playback runs on a monotonic
+  ticker; reps use a smootherstep ease and a natural tempo (the lowering
+  phase takes 15% longer, the lift 15% less) while circles run at constant
+  speed, and a change of movement cross-fades the two poses over 0.4 s
+  instead of cutting. Drag to orbit, double-tap to reset.
+  Settings → 3D guide offers Auto / Detailed / Lite: Auto uses the detailed
+  body unless the phone is a low-RAM device (a platform channel reports
+  memory), Lite is the original capsule mannequin (`Mannequin3D`), which is
+  also the fallback while the body loads or if the asset is missing.
+  Poses are composed with a flat-back hinge helper (`MannequinClips.hinge`)
+  so squats, deadlifts, rows and push-ups show safe mechanics. Contact
+  sheets for review: `FIGURE_PREVIEW=<dir> flutter test
+  test/preview/figure_preview_test.dart` (body, all clips),
+  `FIGURE_HEAD=<dir> flutter test test/preview/figure_head_preview_test.dart`
+  (head and shoulders, large) and `MANNEQUIN_PREVIEW=<dir> flutter test
+  test/preview` (mannequin); `FIGURE_BENCH=1 flutter test
+  test/preview/figure_benchmark_test.dart` times a frame. To rebuild the
+  body after changing the script or the poses, download
+  `human-base-meshes-bundle-v1.4.1.zip` from the Blender demo-files page
+  (50 MB, not vendored) and run
+  `blender -b -P tool/figure/build_figure.py -- --poses tool/figure/poses.json --out assets/figure/athlete.glb --base <unzipped>/human_base_meshes_bundle.blend --base-object GEO-body_male_realistic --base-tris 36000`.
+  Without `--base` the script builds a procedural skin-modifier body
+  instead. The GLB is committed, so normal builds do not need Blender.
 - **Live view on every item**: the camera stays on for the whole session,
   with the skeleton overlay, the 3D guide picture-in-picture and the coach
   card. Rep movements are counted and corrected; the body part involved in
@@ -128,6 +182,57 @@ works offline and nothing about you leaves the phone.
   movement and the equipment to grab, comments after every set, counts the
   rest down, and ends with a summary and a tip for next time; all spoken by
   the voice coach.
+
+## Daily habit: challenges, goals, badges and sharing
+
+Everything here is derived from the same local history, so nothing new has
+to be synced or can drift (code in `lib/core/engagement/` and
+`lib/features/engagement/`).
+
+- **Daily challenge**: a new challenge every day, seeded from the date and
+  scaled to your level at the start of the day (`DailyChallenges.forDay`):
+  one exercise on most days, two on Tuesday/Thursday/Saturday. Progress
+  comes from the day's sets (any set counts, so you can split it up); the
+  home card starts the remaining reps as a camera set with the challenge as
+  its target, finishing it banks a +60 XP bonus, and consecutive days build
+  a challenge streak. `DailyChallenges.completedDays` replays history day
+  by day (with the level each day started at) so past completions never
+  change.
+- **Achievements**: 30 badges in bronze/silver/gold across consistency,
+  volume, strength, coaching, MY PT, challenges, body and daily challenges
+  (`Achievements.evaluate`), with progress toward each locked one. New
+  badges appear on the set-complete and MY PT summary screens and on the
+  home level card until the trophy room (`/achievements`) is opened; any
+  badge can be shared.
+- **Weekly goal and report**: pick the active days you aim for each week
+  (Settings → Goals & rest days). Home shows Mon–Sun dots and the goal; the
+  This week screen (`/week`) compares workouts, active days, reps, minutes,
+  XP, records and daily challenges with last week, counts weeks in a row on
+  goal, and shares a week card.
+- **Rest days and streak nudge**: chosen weekdays never break the streak
+  (`StatsCalculator.currentStreak(restWeekdays:)` skips them without
+  counting them). An evening "streak at risk" notification fires only when
+  nothing was logged that day and it is not a rest day; it is rescheduled
+  on every app open and after every saved set or session, so a done day is
+  silent (`StreakNudge`).
+- **Intervals** (`/intervals`): Tabata, HIIT 30/15, EMOM, AMRAP and Core
+  presets, or your own work/rest/rounds with any library movements. They
+  run through the MY PT engine as a bare plan (no warm-up or cool-down,
+  round → rest → round with no intro cards): the camera counts reps where
+  it can, a work clock ends each round (`PlanItem.capSeconds`), EMOM rounds
+  rest for whatever is left of the minute, and the session is logged and
+  scored like any MY PT session.
+- **Beat your best**: personal bests per exercise (`PersonalBests`), a
+  "Beat it" shortcut under the exercise picker that sets the target to
+  best + 1, a best marker on the camera progress bar, a spoken "New
+  personal best!" the moment it falls, and a best card on the summary.
+- **Today's pick**: when no programme is active, home suggests a MY PT
+  session for the muscle groups that are fresh in the recovery map.
+- **Share cards**: a branded 1080×1350 image for a set, a MY PT session, a
+  week or a badge (`ShareCard` + `showShareSheet`, via the system share
+  sheet; nothing is uploaded).
+- **Calendar**: History opens with a monthly calendar (intensity, rest-day
+  dots, challenge stars); tap a day for its detail.
 
 ## Strength tracking, programmes and progress
 

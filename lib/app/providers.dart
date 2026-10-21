@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/permissions/permission_service.dart';
+import '../core/engagement/daily_challenge.dart';
 import '../core/levels/level_system.dart';
 import '../core/utils/date_utils.dart';
 import '../core/utils/reminder_calculator.dart';
 import '../core/utils/stats_calculator.dart';
 import '../features/pt/models/pt_record.dart';
+import '../features/notifications/streak_nudge.dart';
 import '../features/pt/pt_providers.dart';
 import '../models/daily_stats.dart';
 import '../models/exercise.dart';
@@ -121,6 +123,7 @@ class SessionsNotifier extends Notifier<List<WorkoutSession>> {
       verified: verified,
     );
     refresh();
+    unawaited(ref.read(streakNudgeProvider).sync());
     return session;
   }
 
@@ -228,6 +231,7 @@ final currentStreakProvider = Provider<int>(
     ref.watch(sessionsProvider),
     ref.watch(clockProvider),
     ptRecords: ref.watch(ptRecordsProvider),
+    restWeekdays: ref.watch(settingsProvider.select((s) => s.restWeekdays)),
   ),
 );
 
@@ -295,12 +299,24 @@ final ptRecordsForDayProvider = Provider.family<List<PtRecord>, DateTime>((
 // Levels
 // -----------------------------------------------------------------------------
 
-/// Lifetime XP across every attempted session.
-final totalXpProvider = Provider<int>(
-  (ref) => LevelSystem.totalXp(
-    ref.watch(sessionsProvider),
+/// Days on which the daily challenge was completed, derived from history.
+final dailyChallengeDaysProvider = Provider<Set<DateTime>>(
+  (ref) => DailyChallenges.completedDays(
+    sessions: ref.watch(sessionsProvider),
     ptRecords: ref.watch(ptRecordsProvider),
+    through: ref.watch(clockProvider),
   ),
+);
+
+/// Lifetime XP across every attempted session, MY PT session and completed
+/// daily challenge.
+final totalXpProvider = Provider<int>(
+  (ref) =>
+      LevelSystem.totalXp(
+        ref.watch(sessionsProvider),
+        ptRecords: ref.watch(ptRecordsProvider),
+      ) +
+      DailyChallenges.bonusXp(ref.watch(dailyChallengeDaysProvider)),
 );
 
 /// Current level, title and progress towards the next level.

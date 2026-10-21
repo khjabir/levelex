@@ -10,7 +10,7 @@ import '../../../widgets/app_card.dart';
 import '../../../widgets/primary_button.dart';
 import '../../../widgets/section_header.dart';
 import '../../face/face_providers.dart';
-import '../mannequin/mannequin_3d.dart';
+import '../figure/guide_3d.dart';
 import '../models/movement.dart';
 import '../models/workout_plan.dart';
 import '../../strength/strength_providers.dart';
@@ -205,7 +205,7 @@ class _PlanItemCard extends StatelessWidget {
             SizedBox(
               width: 72,
               height: 72,
-              child: Mannequin3D(
+              child: Guide3D(
                 clipId: m.clip,
                 interactive: false,
                 autoRotate: false,

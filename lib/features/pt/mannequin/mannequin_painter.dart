@@ -18,6 +18,7 @@ class MannequinPainter extends CustomPainter {
     required this.showFloor,
     required this.compact,
     this.tint = AppColors.primary,
+    this.emphasis = const {},
     this.frame,
   });
 
@@ -28,6 +29,10 @@ class MannequinPainter extends CustomPainter {
   final bool showFloor;
   final bool compact;
   final Color tint;
+
+  /// Parts that do the work; when set, every other part is drawn neutral.
+  final Set<String> emphasis;
+  static const _muted = Color(0xFF8E98A8);
 
   /// Extents to fit; defaults to this pose alone (steady only for stills).
   final MannequinFrame? frame;
@@ -56,7 +61,8 @@ class MannequinPainter extends CustomPainter {
 
     (Offset, double) project(Vec3 p) {
       final c = view.apply(p - target);
-      final depth = c.z + _distance;
+      // The camera sits on +z, so nearer points have larger z.
+      final depth = _distance - c.z;
       final s = focal / depth;
       return (Offset(centre.dx + c.x * s, centre.dy - c.y * s), depth);
     }
@@ -84,6 +90,7 @@ class MannequinPainter extends CustomPainter {
           (da + db) / 2,
           bone.thickness * focal / ((da + db) / 2),
           flagged: highlight.contains(bone.part),
+          dim: emphasis.isNotEmpty && !emphasis.contains(bone.part),
           light: facing,
         ),
       );
@@ -99,20 +106,32 @@ class MannequinPainter extends CustomPainter {
           [for (final p in pts) p.$1],
           depth,
           flagged: highlight.contains('torso'),
+          dim: emphasis.isNotEmpty && !emphasis.contains('torso'),
         ),
       );
     }
     final head = joints['head'];
     if (head != null) {
       final (hp, hd) = project(head);
-      items.add(_Prim.head(hp, hd, Rig.headRadius * focal / hd));
+      items.add(
+        _Prim.head(
+          hp,
+          hd,
+          Rig.headRadius * focal / hd,
+          dim: emphasis.isNotEmpty,
+        ),
+      );
       // Face hint: nose direction is body +Z through the neck pitch.
     }
     items.sort((x, y) => y.depth.compareTo(x.depth));
 
     for (final item in items) {
       final shade = ((item.depth - (_distance - 1.0)) / 2.0).clamp(0.0, 1.0);
-      final base = item.flagged ? AppColors.warning : tint;
+      final base = item.flagged
+          ? AppColors.warning
+          : item.dim
+          ? _muted
+          : tint;
       switch (item.kind) {
         case _Kind.capsule:
           _capsule(canvas, item, base, shade);
@@ -281,7 +300,8 @@ class MannequinPainter extends CustomPainter {
       old.yaw != yaw ||
       old.pitch != pitch ||
       old.highlight != highlight ||
-      old.tint != tint;
+      old.tint != tint ||
+      old.emphasis != emphasis;
 }
 
 enum _Kind { capsule, quad, head }
@@ -295,6 +315,7 @@ class _Prim {
     this.points,
     this.width = 0,
     this.flagged = false,
+    this.dim = false,
     this.light = 1,
   });
 
@@ -305,6 +326,7 @@ class _Prim {
     double width, {
     required bool flagged,
     required double light,
+    bool dim = false,
   }) => _Prim._(
     _Kind.capsule,
     depth,
@@ -312,6 +334,7 @@ class _Prim {
     b: b,
     width: width,
     flagged: flagged,
+    dim: dim,
     light: light,
   );
 
@@ -319,10 +342,15 @@ class _Prim {
     List<Offset> points,
     double depth, {
     required bool flagged,
-  }) => _Prim._(_Kind.quad, depth, points: points, flagged: flagged);
+    bool dim = false,
+  }) => _Prim._(_Kind.quad, depth, points: points, flagged: flagged, dim: dim);
 
-  factory _Prim.head(Offset c, double depth, double radius) =>
-      _Prim._(_Kind.head, depth, a: c, width: radius);
+  factory _Prim.head(
+    Offset c,
+    double depth,
+    double radius, {
+    bool dim = false,
+  }) => _Prim._(_Kind.head, depth, a: c, width: radius, dim: dim);
 
   final _Kind kind;
   final double depth;
@@ -331,5 +359,6 @@ class _Prim {
   final List<Offset>? points;
   final double width;
   final bool flagged;
+  final bool dim;
   final double light;
 }

@@ -14,8 +14,9 @@ import '../../widgets/app_card.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/section_header.dart';
 import '../face/face_providers.dart';
-import '../pt/mannequin/mannequin_3d.dart';
+import '../pt/figure/guide_3d.dart';
 import 'exercise_icons.dart';
+import 'workout_launch.dart';
 
 /// Training guide for the selected exercise: animated demo, how-to cues,
 /// common mistakes with their fixes, camera placement, then the start button.
@@ -76,8 +77,9 @@ class WorkoutIntroScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final settings = ref.watch(settingsProvider);
-    final exercise = settings.selectedExercise;
-    final target = settings.targetFor(exercise);
+    final launch = ref.watch(workoutLaunchProvider);
+    final exercise = launch?.exercise ?? settings.selectedExercise;
+    final target = launch?.target ?? settings.targetFor(exercise);
     final faceRegistered = ref.watch(faceRegisteredProvider);
     final mistakes = mistakesFor(exercise);
 
@@ -106,7 +108,7 @@ class WorkoutIntroScreen extends ConsumerWidget {
                               children: [
                                 SizedBox(
                                   height: 230,
-                                  child: Mannequin3D(
+                                  child: Guide3D(
                                     key: ValueKey(exercise.clipId),
                                     clipId: exercise.clipId,
                                   ),
@@ -144,7 +146,8 @@ class WorkoutIntroScreen extends ConsumerWidget {
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Target: ${exercise.describeTarget(target)}',
+                                        '${launch?.reason != null ? '${launch!.reason}: ' : 'Target: '}'
+                                        '${exercise.describeTarget(target)}',
                                         style: theme.textTheme.titleSmall
                                             ?.copyWith(
                                               color: AppColors.primary,
@@ -337,7 +340,7 @@ class _MistakeCard extends StatelessWidget {
           children: [
             SizedBox(
               height: 96,
-              child: Mannequin3D(
+              child: Guide3D(
                 clipId: exercise.clipId,
                 interactive: false,
                 autoRotate: showDemo,

@@ -312,4 +312,180 @@ void main() {
       expect(AppDateUtils.dayKey(day), '2026-07-04');
     });
   });
+
+  group('rest days', () {
+    // 2026-03-10 (today) is a Tuesday.
+    assert(today.weekday == DateTime.tuesday);
+    const monday = {DateTime.monday};
+    const weekend = {DateTime.sunday, DateTime.monday};
+
+    test('a rest day between workouts keeps the streak but adds nothing', () {
+      final sessions = [
+        session(DateTime(2026, 3, 8, 9)), // Sunday
+        session(DateTime(2026, 3, 10, 9)), // Tuesday
+      ];
+      expect(StatsCalculator.currentStreak(sessions, today), 1);
+      expect(
+        StatsCalculator.currentStreak(sessions, today, restWeekdays: monday),
+        2,
+      );
+    });
+
+    test('two rest weekdays in a row bridge the gap', () {
+      final sessions = [
+        session(DateTime(2026, 3, 7, 9)), // Saturday
+        session(DateTime(2026, 3, 10, 9)), // Tuesday
+      ];
+      expect(
+        StatsCalculator.currentStreak(sessions, today, restWeekdays: weekend),
+        2,
+      );
+    });
+
+    test('a gap on a non-rest day breaks the streak', () {
+      final sessions = [
+        session(DateTime(2026, 3, 7, 9)), // Saturday
+        session(DateTime(2026, 3, 10, 9)), // Tuesday
+      ];
+      expect(
+        StatsCalculator.currentStreak(
+          sessions,
+          today,
+          restWeekdays: const {DateTime.sunday},
+        ),
+        1,
+      );
+    });
+
+    test('today as a rest day carries yesterday\'s streak', () {
+      final sessions = [
+        session(DateTime(2026, 3, 8, 9)), // Sunday
+        session(DateTime(2026, 3, 9, 9)), // Monday
+      ];
+      expect(
+        StatsCalculator.currentStreak(
+          sessions,
+          today,
+          restWeekdays: const {DateTime.tuesday},
+        ),
+        2,
+      );
+      // Today and yesterday both rest days, nothing done on either.
+      final earlier = [
+        session(DateTime(2026, 3, 7, 9)), // Saturday
+        session(DateTime(2026, 3, 8, 9)), // Sunday
+      ];
+      expect(
+        StatsCalculator.currentStreak(
+          earlier,
+          today,
+          restWeekdays: const {DateTime.monday, DateTime.tuesday},
+        ),
+        2,
+      );
+      expect(StatsCalculator.currentStreak(earlier, today), 0);
+    });
+
+    test('a workout on a rest day counts like any other day', () {
+      final sessions = [
+        session(DateTime(2026, 3, 8, 9)), // Sunday
+        session(DateTime(2026, 3, 9, 9)), // Monday (rest)
+        session(DateTime(2026, 3, 10, 9)), // Tuesday
+      ];
+      expect(
+        StatsCalculator.currentStreak(sessions, today, restWeekdays: monday),
+        3,
+      );
+    });
+
+    test('no completed days is still a zero streak', () {
+      const all = {1, 2, 3, 4, 5, 6, 7};
+      expect(
+        StatsCalculator.currentStreak(const [], today, restWeekdays: all),
+        0,
+      );
+      expect(
+        StatsCalculator.currentStreak(
+          [session(DateTime(2026, 3, 9, 9), reps: 3)],
+          today,
+          restWeekdays: all,
+        ),
+        0,
+      );
+      expect(StatsCalculator.longestStreak(const [], restWeekdays: all), 0);
+    });
+
+    test('every weekday a rest day bridges any gap', () {
+      const all = {1, 2, 3, 4, 5, 6, 7};
+      final sessions = [
+        session(DateTime(2026, 2, 1, 9)),
+        session(DateTime(2026, 3, 10, 9)),
+      ];
+      expect(
+        StatsCalculator.currentStreak(sessions, today, restWeekdays: all),
+        2,
+      );
+      expect(StatsCalculator.longestStreak(sessions, restWeekdays: all), 2);
+    });
+
+    test('longestStreak bridges rest weekdays', () {
+      final sessions = [
+        session(DateTime(2026, 3, 6, 9)), // Friday
+        session(DateTime(2026, 3, 7, 9)), // Saturday
+        // Sunday 8th: rest
+        session(DateTime(2026, 3, 9, 9)), // Monday
+        session(DateTime(2026, 3, 10, 9)), // Tuesday
+      ];
+      expect(StatsCalculator.longestStreak(sessions), 2);
+      expect(
+        StatsCalculator.longestStreak(
+          sessions,
+          restWeekdays: const {DateTime.sunday},
+        ),
+        4,
+      );
+      expect(StatsCalculator.longestStreak(sessions, restWeekdays: weekend), 4);
+    });
+
+    test('longestStreak does not bridge a gap with a non-rest day in it', () {
+      final sessions = [
+        session(DateTime(2026, 3, 6, 9)), // Friday
+        // Saturday 7th missing, Sunday 8th rest, Monday 9th missing
+        session(DateTime(2026, 3, 10, 9)), // Tuesday
+        session(DateTime(2026, 3, 11, 9)), // Wednesday
+      ];
+      expect(
+        StatsCalculator.longestStreak(
+          sessions,
+          restWeekdays: const {DateTime.sunday},
+        ),
+        2,
+      );
+      expect(
+        StatsCalculator.longestStreak(
+          sessions,
+          restWeekdays: const {
+            DateTime.saturday,
+            DateTime.sunday,
+            DateTime.monday,
+          },
+        ),
+        3,
+      );
+    });
+
+    test('a gap longer than a week never bridges with a free weekday', () {
+      final sessions = [
+        session(DateTime(2026, 3, 1, 9)),
+        session(DateTime(2026, 3, 10, 9)),
+      ];
+      expect(
+        StatsCalculator.longestStreak(
+          sessions,
+          restWeekdays: const {1, 2, 3, 4, 5, 6},
+        ),
+        1,
+      );
+    });
+  });
 }

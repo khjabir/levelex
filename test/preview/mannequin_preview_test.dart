@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:levelex/features/pt/figure/guide_3d.dart';
 import 'package:levelex/features/pt/mannequin/mannequin_clips.dart';
 import 'package:levelex/features/pt/mannequin/mannequin_painter.dart';
 import 'package:levelex/features/pt/mannequin/rig.dart';
@@ -46,6 +47,12 @@ void main() {
               showFloor: true,
               compact: false,
               frame: MannequinFrame.ofClip(clip),
+              emphasis: Guide3D.litePartsFor(
+                Guide3D.emphasisFor(
+                  Guide3D.musclesFor(id).primary,
+                  Guide3D.musclesFor(id).secondary,
+                ),
+              ),
             ).paint(canvas, const Size(cell, cell));
             canvas.restore();
             x += cell;

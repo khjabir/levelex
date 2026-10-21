@@ -9,7 +9,7 @@ import '../../../models/user_settings.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/primary_button.dart';
 import '../../../widgets/section_header.dart';
-import '../../pt/mannequin/mannequin_3d.dart';
+import '../../pt/figure/guide_3d.dart';
 import '../../pt/models/equipment.dart';
 import '../../pt/models/movement.dart';
 import '../../pt/models/movement_library.dart';
@@ -78,7 +78,7 @@ class MovementDetailScreen extends ConsumerWidget {
                         children: [
                           SizedBox(
                             height: 230,
-                            child: Mannequin3D(clipId: movement.clip),
+                            child: Guide3D(clipId: movement.clip),
                           ),
                           Text(
                             'Drag to rotate the guide',

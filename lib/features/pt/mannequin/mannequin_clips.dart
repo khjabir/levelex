@@ -644,6 +644,7 @@ abstract final class MannequinClips {
       ],
       durations: const [350, 350, 350, 350],
       pingPong: false,
+      continuous: true,
     ),
     MannequinClip(
       id: 'leg_swings',
@@ -714,6 +715,7 @@ abstract final class MannequinClips {
       ],
       durations: const [450, 450, 450, 450],
       pingPong: false,
+      continuous: true,
     ),
     // --- Stretches ------------------------------------------------------
     MannequinClip(

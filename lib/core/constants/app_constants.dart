@@ -33,6 +33,10 @@ abstract final class NotificationConstants {
   /// `reminderIdBase + index` so they never collide with other notifications.
   static const reminderIdBase = 1000;
 
+  /// Evening "streak at risk" nudges (today / tomorrow).
+  static const nudgeIdToday = 900;
+  static const nudgeIdTomorrow = 901;
+
   /// Maximum number of pending reminders we keep scheduled at once. iOS keeps
   /// at most 64 pending local notifications per app; we stay comfortably below.
   static const maxPendingReminders = 60;

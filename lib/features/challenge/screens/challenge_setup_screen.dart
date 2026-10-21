@@ -14,7 +14,7 @@ import '../../../models/exercise.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/primary_button.dart';
 import '../../../widgets/section_header.dart';
-import '../../pt/mannequin/mannequin_3d.dart';
+import '../../pt/figure/guide_3d.dart';
 import '../../workout/exercise_icons.dart';
 import '../challenge_providers.dart';
 import '../models/challenge.dart';
@@ -252,7 +252,7 @@ class _ChallengeSetupScreenState extends ConsumerState<ChallengeSetupScreen> {
                                     child: Column(
                                       children: [
                                         Expanded(
-                                          child: Mannequin3D(
+                                          child: Guide3D(
                                             clipId: type.clipId,
                                             playing: selected,
                                             interactive: false,

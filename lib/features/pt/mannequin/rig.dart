@@ -313,6 +313,13 @@ abstract final class Rig {
     Bone('ankleR', 'toeR', 0.075, part: 'legs'),
   ];
 
+  /// Floor-to-crown height of the standing rig, the scale every clip's
+  /// extents are expressed in.
+  static final double standingHeight = () {
+    final j = solve(const RigPose.sym());
+    return j['head']!.y + headRadius;
+  }();
+
   static Map<String, Vec3> solve(RigPose p) {
     final r0 =
         Mat3.rotY(p.bodyYaw) * Mat3.rotX(p.bodyPitch) * Mat3.rotZ(p.bodyRoll);
@@ -418,10 +425,14 @@ class MannequinClip {
     required this.durations,
     this.pingPong = true,
     this.highlight = const {},
+    this.continuous = false,
   });
 
   final String id;
   final List<RigPose> frames;
+
+  /// Constant-speed looping (circles) instead of easing into every key.
+  final bool continuous;
 
   /// Milliseconds between frame i and i+1 (and, when not ping-pong, from
   /// the last frame back to the first).
@@ -433,15 +444,24 @@ class MannequinClip {
   /// Bone parts drawn in the warning colour.
   final Set<String> highlight;
 
+  /// Reps lower slower than they rise: the way out (eccentric) takes this
+  /// share more time, the way back (concentric) this share less.
+  static const eccentricFactor = 1.15;
+  static const concentricFactor = 0.85;
+
+  int _forwardMs(int d) =>
+      pingPong && !continuous ? (d * eccentricFactor).round() : d;
+  int _backMs(int d) => continuous ? d : (d * concentricFactor).round();
+
   List<(RigPose, RigPose, int)> get _segments {
     final segs = <(RigPose, RigPose, int)>[];
     if (frames.length == 1) return [(frames[0], frames[0], durations[0])];
     for (var i = 0; i < frames.length - 1; i++) {
-      segs.add((frames[i], frames[i + 1], durations[i]));
+      segs.add((frames[i], frames[i + 1], _forwardMs(durations[i])));
     }
     if (pingPong) {
       for (var i = frames.length - 1; i > 0; i--) {
-        segs.add((frames[i], frames[i - 1], durations[i - 1]));
+        segs.add((frames[i], frames[i - 1], _backMs(durations[i - 1])));
       }
     } else {
       segs.add((frames.last, frames.first, durations.last));
@@ -457,12 +477,52 @@ class MannequinClip {
     for (final (a, b, d) in segs) {
       if (t < d) {
         final u = d == 0 ? 1.0 : t / d;
-        final eased = u < 0.5 ? 2 * u * u : 1 - math.pow(-2 * u + 2, 2) / 2;
-        return RigPose.lerp(a, b, eased.toDouble());
+        return RigPose.lerp(a, b, _ease(u));
       }
       t -= d;
     }
     return frames.first;
+  }
+
+  /// Ease in and out of every keyframe (reps pause at the top and bottom),
+  /// or run at constant speed for continuous loops such as circles.
+  double _ease(double u) {
+    if (continuous) return u;
+    // Smootherstep: zero velocity and zero acceleration at both keys, so
+    // the body settles into the top and bottom instead of bouncing off.
+    return u * u * u * (u * (u * 6 - 15) + 10);
+  }
+
+  /// Keyframe indices of each segment, in the same order as [_segments].
+  List<(int, int, int)> get _segmentIndices {
+    final segs = <(int, int, int)>[];
+    if (frames.length == 1) return [(0, 0, durations[0])];
+    for (var i = 0; i < frames.length - 1; i++) {
+      segs.add((i, i + 1, _forwardMs(durations[i])));
+    }
+    if (pingPong) {
+      for (var i = frames.length - 1; i > 0; i--) {
+        segs.add((i, i - 1, _backMs(durations[i - 1])));
+      }
+    } else {
+      segs.add((frames.length - 1, 0, durations.last));
+    }
+    return segs;
+  }
+
+  /// Fractional keyframe position at [ms] (e.g. 1.5 = half way from
+  /// keyframe 1 to keyframe 2), with the same easing as [at], so a skinned
+  /// body animated from the same keyframes stays in step with the rig.
+  double framePosition(int ms) {
+    var t = ms % totalMs;
+    for (final (a, b, d) in _segmentIndices) {
+      if (t < d) {
+        final u = d == 0 ? 1.0 : t / d;
+        return a + (b - a) * _ease(u);
+      }
+      t -= d;
+    }
+    return 0;
   }
 }
 

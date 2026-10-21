@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../features/challenge/screens/challenge_play_screen.dart';
 import '../features/challenge/screens/challenge_setup_screen.dart';
+import '../features/engagement/screens/achievements_screen.dart';
+import '../features/engagement/screens/intervals_screen.dart';
+import '../features/engagement/screens/week_screen.dart';
 import '../features/face/face_registration_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
@@ -54,6 +57,9 @@ abstract final class Routes {
   static const progress = '/progress';
   static const routines = '/routines';
   static const routineEdit = '/routines/edit';
+  static const achievements = '/achievements';
+  static const week = '/week';
+  static const intervals = '/intervals';
 }
 
 /// Where the app opens. Overridden at startup when a reminder launched it.
@@ -222,6 +228,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
         ],
+      ),
+      GoRoute(
+        path: Routes.achievements,
+        pageBuilder: (context, state) =>
+            _page(state, const AchievementsScreen()),
+      ),
+      GoRoute(
+        path: Routes.week,
+        pageBuilder: (context, state) => _page(state, const WeekScreen()),
+      ),
+      GoRoute(
+        path: Routes.intervals,
+        pageBuilder: (context, state) => _page(state, const IntervalsScreen()),
       ),
       GoRoute(
         path: Routes.faceRegistration,

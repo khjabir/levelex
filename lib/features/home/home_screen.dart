@@ -19,13 +19,15 @@ import '../../widgets/progress_ring.dart';
 import '../../widgets/section_header.dart';
 import '../notifications/reminder_controller.dart';
 import '../pt/models/workout_plan.dart';
+import '../engagement/engagement_providers.dart';
+import '../engagement/widgets/home_cards.dart';
 import '../pt/pt_providers.dart';
 import '../strength/logic/routine_launcher.dart';
 import '../strength/logic/routine_schedule.dart';
 import '../strength/models/routine.dart';
 import '../strength/strength_providers.dart';
 import '../workout/exercise_icons.dart';
-import '../pt/mannequin/mannequin_3d.dart';
+import '../pt/figure/guide_3d.dart';
 
 /// Dashboard: level and XP, today's goal ring, exercise picker, the START
 /// call-to-action, reminder status and today's sessions.
@@ -70,16 +72,25 @@ class HomeScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    _LevelCard(level: level, streak: streak),
+                    _LevelCard(
+                      level: level,
+                      streak: streak,
+                      badges: ref.watch(earnedAchievementCountProvider),
+                      newBadges: ref.watch(newAchievementsProvider).length,
+                      onBadges: () => context.push(Routes.achievements),
+                    ),
                     const SizedBox(height: 14),
+                    const DailyChallengeCard(),
+                    const SizedBox(height: 10),
                     _MyPtCard(onTap: () => context.push(Routes.pt)),
-                    if (ref.watch(activeRoutineProvider) != null) ...[
-                      const SizedBox(height: 10),
+                    const SizedBox(height: 10),
+                    if (ref.watch(activeRoutineProvider) != null)
                       _TodayCard(
                         routine: ref.watch(activeRoutineProvider)!,
                         day: ref.watch(todayRoutineDayProvider),
-                      ),
-                    ],
+                      )
+                    else
+                      const TodayPickCard(),
                     const SizedBox(height: 10),
                     Row(
                       children: [
@@ -124,6 +135,15 @@ class HomeScreen extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: _MiniTile(
+                            icon: Icons.timer_rounded,
+                            title: 'Intervals',
+                            color: AppColors.warning,
+                            onTap: () => context.push(Routes.intervals),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _MiniTile(
                             icon: Icons.menu_book_rounded,
                             title: 'Library',
                             color: AppColors.cyan,
@@ -151,6 +171,8 @@ class HomeScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 14),
+                    const WeekGoalCard(),
+                    const SizedBox(height: 10),
                     _GoalCard(
                       exercise: goalExercise,
                       total: goalTotal,
@@ -198,6 +220,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
+                    BeatBestRow(exercise: selected),
                     const SizedBox(height: 10),
                     PrimaryButton(
                       label: selected.startLabel,
@@ -268,7 +291,7 @@ class _MiniTile extends StatelessWidget {
     final theme = Theme.of(context);
     return AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
       child: Column(
         children: [
           Container(
@@ -281,12 +304,14 @@ class _MiniTile extends StatelessWidget {
             child: Icon(icon, color: color, size: 20),
           ),
           const SizedBox(height: 6),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              maxLines: 1,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -512,10 +537,19 @@ class _HeaderButton extends StatelessWidget {
 
 /// Level, title, XP progress and the streak.
 class _LevelCard extends StatelessWidget {
-  const _LevelCard({required this.level, required this.streak});
+  const _LevelCard({
+    required this.level,
+    required this.streak,
+    this.badges = 0,
+    this.newBadges = 0,
+    this.onBadges,
+  });
 
   final LevelInfo level;
   final int streak;
+  final int badges;
+  final int newBadges;
+  final VoidCallback? onBadges;
 
   @override
   Widget build(BuildContext context) {
@@ -528,6 +562,8 @@ class _LevelCard extends StatelessWidget {
           Row(
             children: [
               Expanded(child: LevelBadge(info: level)),
+              _BadgeChip(count: badges, fresh: newBadges, onTap: onBadges),
+              const SizedBox(width: 8),
               _StreakChip(streak: streak),
             ],
           ),
@@ -555,6 +591,58 @@ class _LevelCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BadgeChip extends StatelessWidget {
+  const _BadgeChip({required this.count, required this.fresh, this.onTap});
+
+  final int count;
+  final int fresh;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      container: true,
+      button: true,
+      label: '$count badges${fresh > 0 ? ', $fresh new' : ''}',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: (fresh > 0 ? AppColors.lime : AppColors.warning).withValues(
+              alpha: fresh > 0 ? 0.22 : 0.14,
+            ),
+            borderRadius: BorderRadius.circular(999),
+            border: fresh > 0
+                ? Border.all(color: AppColors.lime.withValues(alpha: 0.6))
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.emoji_events_rounded,
+                size: 16,
+                color: fresh > 0 ? AppColors.lime : AppColors.warning,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                fresh > 0 ? '$count · $fresh new' : '$count',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: fresh > 0 ? AppColors.lime : AppColors.warning,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -811,7 +899,7 @@ class _ExercisePicker extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Center(
-                        child: Mannequin3D(
+                        child: Guide3D(
                           clipId: type.clipId,
                           size: 84,
                           playing: isSelected,

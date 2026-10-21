@@ -14,6 +14,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
 import '../face/face_providers.dart';
 import '../notifications/reminder_controller.dart';
+import '../notifications/streak_nudge.dart';
 import '../challenge/challenge_providers.dart';
 import '../pt/pt_providers.dart';
 import '../strength/data/backup_actions.dart';
@@ -51,6 +52,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final after = ref.read(settingsProvider);
     if (ReminderController.affectsSchedule(before, after)) {
       await ref.read(reminderControllerProvider.notifier).reschedule();
+      await ref.read(streakNudgeProvider).sync();
+    } else if (StreakNudge.affects(before, after)) {
+      await ref.read(streakNudgeProvider).sync();
     }
   }
 
@@ -272,6 +276,117 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       type: type,
                       value: settings.targetFor(type),
                       onChanged: (v) => _update((s) => s.withTarget(type, v)),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const SectionHeader('Goals & rest days'),
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Weekly goal',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            Text(
+                              'Active days you aim for each week.',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: settings.weeklyGoal > 1
+                            ? () => _update(
+                                (s) => s.copyWith(weeklyGoal: s.weeklyGoal - 1),
+                              )
+                            : null,
+                        icon: const Icon(Icons.remove_circle_outline),
+                      ),
+                      Text(
+                        '${settings.weeklyGoal}',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: settings.weeklyGoal < 7
+                            ? () => _update(
+                                (s) => s.copyWith(weeklyGoal: s.weeklyGoal + 1),
+                              )
+                            : null,
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  Text('Rest days', style: theme.textTheme.titleMedium),
+                  Text(
+                    'These never break your streak. Reminders still run.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      for (var d = DateTime.monday; d <= DateTime.sunday; d++)
+                        FilterChip(
+                          label: Text(
+                            const [
+                              'Mon',
+                              'Tue',
+                              'Wed',
+                              'Thu',
+                              'Fri',
+                              'Sat',
+                              'Sun',
+                            ][d - 1],
+                          ),
+                          selected: settings.restWeekdays.contains(d),
+                          onSelected: (on) => _update(
+                            (s) => s.copyWith(
+                              restWeekdays: on
+                                  ? {...s.restWeekdays, d}
+                                  : (s.restWeekdays.toSet()..remove(d)),
+                            ),
+                          ),
+                          showCheckmark: false,
+                          selectedColor: AppColors.secondary.withValues(
+                            alpha: 0.3,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  const Divider(),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Streak nudge'),
+                    subtitle: Text(
+                      'One evening reminder at ${settings.nudgeTime.label} '
+                      'when nothing is logged yet that day.',
+                    ),
+                    value: settings.nudgeEnabled,
+                    onChanged: (v) =>
+                        _update((s) => s.copyWith(nudgeEnabled: v)),
+                  ),
+                  if (settings.nudgeEnabled)
+                    TimeTile(
+                      title: 'Nudge time',
+                      icon: Icons.nightlight_outlined,
+                      value: settings.nudgeTime,
+                      onChanged: (t) =>
+                          _update((s) => s.copyWith(nudgeTime: t)),
                     ),
                 ],
               ),
@@ -556,6 +671,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       subtitle: const Text('Also erases your score and streak'),
                       onTap: _eraseFaceData,
                     ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const SectionHeader('3D guide'),
+            AppCard(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SegmentedButton<GuideQuality>(
+                    segments: [
+                      for (final q in GuideQuality.values)
+                        ButtonSegment(value: q, label: Text(q.label)),
+                    ],
+                    selected: {settings.guideQuality},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (s) =>
+                        _update((x) => x.copyWith(guideQuality: s.first)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    settings.guideQuality.description,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),

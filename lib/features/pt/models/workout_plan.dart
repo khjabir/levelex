@@ -81,6 +81,8 @@ class FixedItem {
     this.repsMin,
     this.seconds,
     this.policy,
+    this.restSeconds,
+    this.capSeconds,
   });
 
   final String movementId;
@@ -94,6 +96,13 @@ class FixedItem {
   /// Progression policy name chosen in the routine (overrides the saved
   /// rule for this exercise), or null.
   final String? policy;
+
+  /// Rest after each set in seconds (intervals); null uses the level's.
+  final int? restSeconds;
+
+  /// Work clock for a rep movement: the set ends when this many seconds
+  /// have passed even if the rep target was not reached (Tabata, EMOM).
+  final int? capSeconds;
 }
 
 /// What the user asked for.
@@ -110,6 +119,7 @@ class PtRequest {
     this.routineId,
     this.routineDayId,
     this.title,
+    this.bare = false,
   });
 
   final Duration duration;
@@ -135,6 +145,9 @@ class PtRequest {
   /// Routine day name shown instead of the mode label.
   final String? title;
 
+  /// Fixed items only: no warm-up or cool-down (interval timers).
+  final bool bare;
+
   bool get fromRoutine => fixed.isNotEmpty;
 
   Set<MuscleGroup> get targetMuscles =>
@@ -152,6 +165,7 @@ class PtRequest {
     String? routineId,
     String? routineDayId,
     String? title,
+    bool? bare,
   }) => PtRequest(
     duration: duration ?? this.duration,
     mode: mode ?? this.mode,
@@ -164,6 +178,7 @@ class PtRequest {
     routineId: routineId ?? this.routineId,
     routineDayId: routineDayId ?? this.routineDayId,
     title: title ?? this.title,
+    bare: bare ?? this.bare,
   );
 }
 
@@ -180,11 +195,15 @@ class PlanItem {
     this.repsMin,
     this.suggestedKg,
     this.suggestionWhy,
+    this.capSeconds,
   });
 
   final Movement movement;
   final PlanPhase phase;
   final int sets;
+
+  /// Work clock for rep movements (intervals); null = reps decide.
+  final int? capSeconds;
 
   /// Bottom of a rep range (double progression); null for a fixed count.
   final int? repsMin;
@@ -209,8 +228,9 @@ class PlanItem {
   bool get loaded => movement.loadedWith(equipment);
 
   /// Seconds of work in one set.
-  double get workSecondsPerSet =>
-      isTimed ? seconds.toDouble() : reps * movement.secondsPerRep;
+  double get workSecondsPerSet => isTimed
+      ? seconds.toDouble()
+      : capSeconds?.toDouble() ?? reps * movement.secondsPerRep;
 
   /// Whole block including rests between sets (not after the last set).
   Duration get estimated => Duration(
@@ -233,6 +253,7 @@ class PlanItem {
     double? suggestedKg,
     String? suggestionWhy,
     bool clearSuggestion = false,
+    int? capSeconds,
   }) => PlanItem(
     movement: movement ?? this.movement,
     phase: phase,
@@ -246,6 +267,7 @@ class PlanItem {
     suggestionWhy: clearSuggestion
         ? null
         : (suggestionWhy ?? this.suggestionWhy),
+    capSeconds: capSeconds ?? this.capSeconds,
   );
 }
 

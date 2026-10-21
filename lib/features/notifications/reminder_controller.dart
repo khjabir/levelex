@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/providers.dart';
+import 'streak_nudge.dart';
 import '../../models/user_settings.dart';
 import '../../services/notification_service.dart';
 
@@ -52,6 +53,8 @@ class ReminderController extends Notifier<ReminderStatus> {
     final settings = ref.read(settingsProvider);
     final outcome = await _service.scheduleReminders(settings);
     await refreshStatus(outcome: outcome);
+    // Rescheduling cancels every pending notification, nudge included.
+    await ref.read(streakNudgeProvider).sync();
   }
 
   /// Re-reads permission state without touching the schedule.

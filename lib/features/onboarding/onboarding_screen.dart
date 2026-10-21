@@ -7,7 +7,7 @@ import '../../app/theme.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/brand_mark.dart';
 import '../../widgets/primary_button.dart';
-import '../pt/mannequin/mannequin_3d.dart';
+import '../pt/figure/guide_3d.dart';
 
 class _Page {
   const _Page({
@@ -185,7 +185,7 @@ class _OnboardingPage extends StatelessWidget {
                       children: [
                         SizedBox(
                           height: 210,
-                          child: Mannequin3D(
+                          child: Guide3D(
                             clipId: page.clipId,
                             playing: active,
                             highlight: page.highlight,

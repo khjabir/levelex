@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'mannequin_clips.dart';
 import 'mannequin_painter.dart';
@@ -20,6 +21,7 @@ class Mannequin3D extends StatefulWidget {
     this.initialYaw = -38,
     this.initialPitch = 14,
     this.highlight = const {},
+    this.emphasis = const {},
     this.showFloor = true,
     this.compact = false,
   });
@@ -34,10 +36,18 @@ class Mannequin3D extends StatefulWidget {
 
   /// Bone parts drawn in the warning colour (e.g. {'hips'}).
   final Set<String> highlight;
+
+  /// Bone parts that do the work (torso, hips, arms, legs): drawn in the
+  /// brand colour while the rest of the body goes neutral. Empty keeps the
+  /// whole figure in the brand colour.
+  final Set<String> emphasis;
   final bool showFloor;
 
   /// Smaller figure for picture-in-picture use.
   final bool compact;
+
+  /// How long a change of movement cross-fades between the two poses.
+  static const crossFadeMs = 420;
 
   @override
   State<Mannequin3D> createState() => _Mannequin3DState();
@@ -45,65 +55,83 @@ class Mannequin3D extends StatefulWidget {
 
 class _Mannequin3DState extends State<Mannequin3D>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+  late final Ticker _ticker;
+  final ValueNotifier<int> _clock = ValueNotifier<int>(0);
   late MannequinClip _clip;
   late MannequinFrame _frame;
   late double _yaw = widget.initialYaw;
   late double _pitch = widget.initialPitch;
   DateTime? _lastDrag;
   int _epoch = 0;
+  MannequinClip? _fromClip;
+  int _fromEpoch = 0;
+  int _switchMs = -100000;
 
   @override
   void initState() {
     super.initState();
     _clip = MannequinClips.clip(widget.clipId);
     _frame = MannequinFrame.ofClip(_clip);
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 60),
-    );
-    if (widget.playing) _controller.repeat();
+    _ticker = createTicker((elapsed) {
+      _clock.value = elapsed.inMilliseconds;
+    });
+    if (widget.playing) _ticker.start();
   }
 
   @override
   void didUpdateWidget(covariant Mannequin3D old) {
     super.didUpdateWidget(old);
     if (old.clipId != widget.clipId) {
+      _fromClip = _clip;
+      _fromEpoch = _epoch;
+      _switchMs = _clock.value;
       _clip = MannequinClips.clip(widget.clipId);
       _frame = MannequinFrame.ofClip(_clip);
-      _epoch = _controller.lastElapsedDuration?.inMilliseconds ?? 0;
+      _epoch = _clock.value;
     }
     if (old.playing != widget.playing) {
-      widget.playing ? _controller.repeat() : _controller.stop();
+      if (widget.playing) {
+        if (!_ticker.isActive) _ticker.start();
+      } else {
+        _ticker.stop();
+      }
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ticker.dispose();
+    _clock.dispose();
     super.dispose();
   }
-
-  int get _elapsedMs => (_controller.lastElapsedDuration?.inMilliseconds ?? 0);
 
   @override
   Widget build(BuildContext context) {
     final body = AnimatedBuilder(
-      animation: _controller,
+      animation: _clock,
       builder: (context, _) {
-        final ms = _elapsedMs - _epoch;
+        final now = _clock.value;
+        final ms = math.max(0, now - _epoch);
         final idleFor = _lastDrag == null
             ? 1e9
             : DateTime.now().difference(_lastDrag!).inMilliseconds.toDouble();
         final yaw = widget.autoRotate && idleFor > 2500
-            ? _yaw + math.sin(ms / 4200) * 22
+            ? _yaw + math.sin(now / 4200) * 22
             : _yaw;
+        var pose = _clip.at(widget.playing ? ms : 0);
+        final sinceSwitch = now - _switchMs;
+        if (_fromClip != null && sinceSwitch < Mannequin3D.crossFadeMs) {
+          final u = (sinceSwitch / Mannequin3D.crossFadeMs).clamp(0.0, 1.0);
+          final from = _fromClip!.at(math.max(0, now - _fromEpoch));
+          pose = RigPose.lerp(from, pose, u * u * (3 - 2 * u));
+        }
         return CustomPaint(
           painter: MannequinPainter(
-            pose: _clip.at(ms < 0 ? 0 : ms),
+            pose: pose,
             yaw: yaw,
             pitch: _pitch,
             highlight: {...widget.highlight, ..._clip.highlight},
+            emphasis: widget.emphasis,
             showFloor: widget.showFloor,
             compact: widget.compact,
             frame: _frame,

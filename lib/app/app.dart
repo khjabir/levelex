@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants/app_constants.dart';
 import '../features/notifications/reminder_controller.dart';
+import '../features/notifications/streak_nudge.dart';
 import 'providers.dart';
 import 'routes.dart';
 import 'theme.dart';
@@ -75,6 +76,7 @@ class _LevelexAppState extends ConsumerState<LevelexApp>
     } catch (e) {
       debugPrint('Reminder refresh failed: $e');
     }
+    await ref.read(streakNudgeProvider).sync();
   }
 
   @override

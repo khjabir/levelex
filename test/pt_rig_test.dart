@@ -4,6 +4,30 @@ import 'package:levelex/features/pt/mannequin/rig.dart';
 import 'package:levelex/features/pt/models/movement_library.dart';
 
 void main() {
+  group('MannequinClip timing', () {
+    test('reps ease into every key, circles run at constant speed', () {
+      final squat = MannequinClips.clip('squat');
+      final circles = MannequinClips.clip('arm_circles');
+      expect(circles.continuous, isTrue);
+      expect(squat.continuous, isFalse);
+      final d = squat.durations.first;
+      final down = (d * MannequinClip.eccentricFactor).round();
+      final up = (d * MannequinClip.concentricFactor).round();
+      // Eased: a quarter of the way down is well short of a quarter.
+      expect(squat.framePosition(down ~/ 4), lessThan(0.12));
+      expect(squat.framePosition(down ~/ 4), greaterThan(0.0));
+      // Half way through the segment is exactly the middle.
+      expect(squat.framePosition(down ~/ 2), closeTo(0.5, 0.02));
+      final dc = circles.durations.first;
+      expect(circles.framePosition(dc ~/ 4), closeTo(0.25, 0.02));
+      // The way back up is quicker than the way down.
+      expect(squat.totalMs, down + up);
+      expect(up, lessThan(down));
+      expect(squat.framePosition(down + up ~/ 2), closeTo(0.5, 0.02));
+      expect(circles.framePosition(circles.totalMs - 1), closeTo(0.0, 0.05));
+    });
+  });
+
   group('MannequinFrame', () {
     test('a push-up clip is low and wide, a standing clip tall and narrow', () {
       final stand = MannequinFrame.ofClip(MannequinClips.clip('stand'));

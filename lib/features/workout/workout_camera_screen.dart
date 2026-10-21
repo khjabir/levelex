@@ -323,9 +323,16 @@ class _TopHud extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    state.exercise.label.toUpperCase(),
+                    state.newBest
+                        ? 'NEW PERSONAL BEST'
+                        : state.launchReason?.toUpperCase() ??
+                              state.exercise.label.toUpperCase(),
                     style: theme.textTheme.labelLarge?.copyWith(
-                      color: Colors.white70,
+                      color: state.newBest
+                          ? AppColors.lime
+                          : state.launchReason != null
+                          ? AppColors.cyan
+                          : Colors.white70,
                       letterSpacing: 2,
                     ),
                   ),
@@ -357,11 +364,59 @@ class _TopHud extends StatelessWidget {
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: AnimatedProgressBar(
-                      value: state.progress,
-                      height: 8,
-                      backgroundColor: Colors.white24,
-                      semanticLabel: 'Set progress',
+                    child: Stack(
+                      alignment: Alignment.centerLeft,
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedProgressBar(
+                          value: state.progress,
+                          height: 8,
+                          backgroundColor: Colors.white24,
+                          semanticLabel: 'Set progress',
+                        ),
+                        if (state.bestReps != null &&
+                            state.bestReps! > 0 &&
+                            state.targetReps > 0)
+                          Positioned.fill(
+                            child: LayoutBuilder(
+                              builder: (context, c) {
+                                final f = (state.bestReps! / state.targetReps)
+                                    .clamp(0.0, 1.0);
+                                return Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned(
+                                      left: c.maxWidth * f - 1,
+                                      top: -3,
+                                      bottom: -3,
+                                      child: Tooltip(
+                                        message: 'Your best: ${state.bestReps}',
+                                        child: Container(
+                                          width: 2,
+                                          color: state.newBest
+                                              ? AppColors.lime
+                                              : AppColors.warning,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      left: c.maxWidth * f - 18,
+                                      top: -18,
+                                      child: Text(
+                                        'best ${state.bestReps}',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: AppColors.warning,
+                                              fontSize: 9,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],

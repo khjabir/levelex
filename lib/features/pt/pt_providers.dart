@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../notifications/streak_nudge.dart';
 import 'data/pt_repository.dart';
 import 'models/equipment.dart';
 import 'models/pt_record.dart';
@@ -40,6 +43,7 @@ class PtRecordsNotifier extends Notifier<List<PtRecord>> {
   Future<void> add(PtRecord record) async {
     await ref.read(ptRepositoryProvider).upsertRecord(record);
     state = ref.read(ptRepositoryProvider).records();
+    unawaited(ref.read(streakNudgeProvider).sync());
   }
 
   Future<void> clear() async {

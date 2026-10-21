@@ -23,14 +23,16 @@ class WorkoutPlanner {
         ? MuscleGroup.full
         : request.targetMuscles;
 
-    final warmUp = _fillTimed(
-      request,
-      rng,
-      phase: PlanPhase.warmUp,
-      budget: warmBudget,
-      targets: targets,
-      maxItems: 5,
-    );
+    final warmUp = request.bare
+        ? const <PlanItem>[]
+        : _fillTimed(
+            request,
+            rng,
+            phase: PlanPhase.warmUp,
+            budget: warmBudget,
+            targets: targets,
+            maxItems: 5,
+          );
     List<PlanItem> stretches() => _fillTimed(
       request,
       rng,
@@ -54,14 +56,16 @@ class WorkoutPlanner {
       for (final i in main) ...i.movement.primary,
       for (final i in main) ...i.movement.secondary,
     };
-    final coolDown = _fillTimed(
-      request,
-      rng,
-      phase: PlanPhase.coolDown,
-      budget: coolBudget,
-      targets: worked.isEmpty ? targets : worked,
-      maxItems: 5,
-    );
+    final coolDown = request.bare
+        ? const <PlanItem>[]
+        : _fillTimed(
+            request,
+            rng,
+            phase: PlanPhase.coolDown,
+            budget: coolBudget,
+            targets: worked.isEmpty ? targets : worked,
+            maxItems: 5,
+          );
     return WorkoutPlan(
       request: request,
       warmUp: warmUp,
@@ -241,11 +245,14 @@ class WorkoutPlanner {
           sets: f.sets,
           reps: m.isTimed ? 0 : f.reps,
           seconds: f.seconds ?? m.baseSeconds,
-          rest: m.compound && m.loadedWith(equipment)
+          rest: f.restSeconds != null
+              ? Duration(seconds: f.restSeconds!)
+              : m.compound && m.loadedWith(equipment)
               ? request.level.rest + const Duration(seconds: 45)
               : request.level.rest,
           equipment: equipment,
           repsMin: f.repsMin,
+          capSeconds: f.capSeconds,
         ),
       );
     }

@@ -9,6 +9,7 @@ import '../../core/utils/date_utils.dart';
 import '../../models/daily_stats.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
+import 'widgets/month_calendar.dart';
 import '../home/home_screen.dart';
 import '../pt/screens/pt_home_screen.dart';
 
@@ -30,6 +31,19 @@ class HistoryScreen extends ConsumerWidget {
             : ListView(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
                 children: [
+                  const SectionHeader('Calendar'),
+                  AppCard(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+                    child: _CalendarSection(
+                      byDay: byDay,
+                      today: now,
+                      onTapDay: (day) {
+                        final stats = byDay[day];
+                        if (stats != null) _showDay(context, stats);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   const SectionHeader('Last 7 days'),
                   AppCard(
                     glow: true,
@@ -67,6 +81,43 @@ class HistoryScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (context) => _DayDetailSheet(stats: stats),
+    );
+  }
+}
+
+class _CalendarSection extends ConsumerStatefulWidget {
+  const _CalendarSection({
+    required this.byDay,
+    required this.today,
+    required this.onTapDay,
+  });
+
+  final Map<DateTime, DailyStats> byDay;
+  final DateTime today;
+  final ValueChanged<DateTime> onTapDay;
+
+  @override
+  ConsumerState<_CalendarSection> createState() => _CalendarSectionState();
+}
+
+class _CalendarSectionState extends ConsumerState<_CalendarSection> {
+  late DateTime _month = DateTime(widget.today.year, widget.today.month);
+
+  @override
+  Widget build(BuildContext context) {
+    final starred = ref.watch(dailyChallengeDaysProvider);
+    final rest = ref.watch(settingsProvider.select((s) => s.restWeekdays));
+    return MonthCalendar(
+      month: _month,
+      today: widget.today,
+      intensity: {
+        for (final e in widget.byDay.entries)
+          e.key: e.value.attemptedSessions + e.value.ptSessions,
+      },
+      starred: starred,
+      restWeekdays: rest,
+      onTapDay: widget.onTapDay,
+      onMonthChanged: (m) => setState(() => _month = m),
     );
   }
 }

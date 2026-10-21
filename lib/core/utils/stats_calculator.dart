@@ -88,36 +88,50 @@ abstract final class StatsCalculator {
   /// If today has no completed set yet, the streak carries over from
   /// yesterday (the user still has time today). Multiple sessions on one day
   /// count as a single day.
+  ///
+  /// A day whose weekday is in [restWeekdays] ([DateTime.monday]..
+  /// [DateTime.sunday]) never breaks the streak: when nothing was completed
+  /// on it the walk skips over it; when something was, it counts like any
+  /// other day.
   static int currentStreak(
     Iterable<WorkoutSession> sessions,
     DateTime today, {
     Iterable<PtRecord> ptRecords = const [],
+    Set<int> restWeekdays = const {},
   }) {
     final days = completedDays(sessions, ptRecords: ptRecords);
+    if (days.isEmpty) return 0;
+    final earliest = days.reduce((a, b) => a.isBefore(b) ? a : b);
     var cursor = AppDateUtils.dateOnly(today);
     if (!days.contains(cursor)) {
       cursor = AppDateUtils.addDays(cursor, -1);
-      if (!days.contains(cursor)) return 0;
     }
     var streak = 0;
-    while (days.contains(cursor)) {
-      streak++;
+    while (!cursor.isBefore(earliest)) {
+      if (days.contains(cursor)) {
+        streak++;
+      } else if (!restWeekdays.contains(cursor.weekday)) {
+        break;
+      }
       cursor = AppDateUtils.addDays(cursor, -1);
     }
     return streak;
   }
 
-  /// The longest run of consecutive completed days ever recorded.
+  /// The longest run of consecutive completed days ever recorded. Days whose
+  /// weekday is in [restWeekdays] may sit between two completed days without
+  /// ending the run (they add nothing to it).
   static int longestStreak(
     Iterable<WorkoutSession> sessions, {
     Iterable<PtRecord> ptRecords = const [],
+    Set<int> restWeekdays = const {},
   }) {
     final days = completedDays(sessions, ptRecords: ptRecords).toList()..sort();
     var best = 0;
     var run = 0;
     DateTime? previous;
     for (final day in days) {
-      if (previous != null && AppDateUtils.daysBetween(previous, day) == 1) {
+      if (previous != null && _bridged(previous, day, restWeekdays)) {
         run++;
       } else {
         run = 1;
@@ -126,5 +140,19 @@ abstract final class StatsCalculator {
       previous = day;
     }
     return best;
+  }
+
+  /// Whether every day strictly between [from] and [to] is a rest weekday.
+  static bool _bridged(DateTime from, DateTime to, Set<int> restWeekdays) {
+    final gap = AppDateUtils.daysBetween(from, to);
+    if (gap <= 1) return gap == 1;
+    if (restWeekdays.length >= DateTime.daysPerWeek) return true;
+    // Any seven consecutive days contain a non-rest weekday.
+    if (gap > DateTime.daysPerWeek) return false;
+    for (var i = 1; i < gap; i++) {
+      final between = AppDateUtils.addDays(from, i);
+      if (!restWeekdays.contains(between.weekday)) return false;
+    }
+    return true;
   }
 }

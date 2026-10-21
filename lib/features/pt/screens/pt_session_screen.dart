@@ -12,6 +12,10 @@ import '../../../core/levels/level_system.dart';
 import '../../../models/coaching.dart';
 import '../../../models/form_status.dart';
 import '../../../widgets/animated_progress_bar.dart';
+import '../../../widgets/badge_tile.dart';
+import '../../../widgets/share_card.dart';
+import '../../../widgets/share_sheet.dart';
+import '../../engagement/engagement_providers.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/celebration.dart';
 import '../../../widgets/primary_button.dart';
@@ -20,7 +24,7 @@ import '../../../widgets/section_header.dart';
 import '../../workout/widgets/camera_preview_fill.dart';
 import '../../workout/widgets/coach_card.dart';
 import '../../workout/widgets/pose_painter.dart';
-import '../mannequin/mannequin_3d.dart';
+import '../figure/guide_3d.dart';
 import '../../strength/models/progression_rule.dart';
 import '../../strength/strength_providers.dart';
 import '../../strength/widgets/load_stepper.dart';
@@ -268,7 +272,7 @@ class _IntroView extends ConsumerWidget {
                             children: [
                               SizedBox(
                                 height: 250,
-                                child: Mannequin3D(
+                                child: Guide3D(
                                   key: ValueKey(m.clip),
                                   clipId: m.clip,
                                 ),
@@ -642,7 +646,11 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
     final theme = Theme.of(context);
     final item = state.item;
     final timerItem = item.movement.tracking is TimerTracking;
-    final remaining = (item.seconds - state.secondsInSet).clamp(0, 9999);
+    final cap = item.capSeconds;
+    final remaining = ((cap ?? item.seconds) - state.secondsInSet).clamp(
+      0,
+      9999,
+    );
     final profile = ref.watch(gymProfileProvider);
     final cameraController = controller.cameraService?.controller;
     final exercise = switch (item.movement.tracking) {
@@ -768,8 +776,11 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                           ],
                         ),
                         Text(
-                          'SET ${state.setIndex + 1} OF ${item.sets}'
-                          '${state.loadKg != null && state.loadKg! > 0 ? ' · ${ref.watch(weightUnitProvider).format(state.loadKg!)}' : ''}',
+                          state.plan.request.bare
+                              ? 'ROUND ${state.index + 1} OF ${state.items.length}'
+                                    '${cap != null ? ' · ${formatClock(Duration(seconds: remaining))} LEFT' : ''}'
+                              : 'SET ${state.setIndex + 1} OF ${item.sets}'
+                                    '${state.loadKg != null && state.loadKg! > 0 ? ' · ${ref.watch(weightUnitProvider).format(state.loadKg!)}' : ''}',
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: AppColors.primary,
                             letterSpacing: 1.4,
@@ -927,7 +938,7 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
               child: Column(
                 children: [
                   Expanded(
-                    child: Mannequin3D(
+                    child: Guide3D(
                       clipId: item.movement.clip,
                       interactive: _guideLarge,
                       autoRotate: !_guideLarge,
@@ -1112,7 +1123,7 @@ class _TimedView extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Mannequin3D(
+                  child: Guide3D(
                     key: ValueKey(item.movement.clip),
                     clipId: item.movement.clip,
                     playing: !state.paused,
@@ -1272,7 +1283,9 @@ class _RestView extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Next: set ${state.setIndex + 2} of ${item.sets} · ${item.movement.name}',
+            state.plan.request.bare
+                ? 'Next: round ${state.index + 1} of ${state.items.length} · ${item.movement.name}'
+                : 'Next: set ${state.setIndex + 2} of ${item.sets} · ${item.movement.name}',
             style: theme.textTheme.titleMedium?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -1330,6 +1343,12 @@ class _SummaryView extends ConsumerWidget {
     final done = record?.itemsDone ?? 0;
     final total = record?.itemCount ?? 0;
     final complete = record != null && record.completion >= 0.8;
+    final newBadges = ref.watch(newAchievementsProvider);
+    if (newBadges.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) ref.read(markAchievementsSeenProvider)();
+      });
+    }
     return Stack(
       children: [
         SafeArea(
@@ -1473,6 +1492,38 @@ class _SummaryView extends ConsumerWidget {
                                 ),
                               ),
                             ],
+                            if (newBadges.isNotEmpty) ...[
+                              const SizedBox(height: 20),
+                              SectionHeader(
+                                newBadges.length == 1
+                                    ? 'New badge'
+                                    : 'New badges',
+                              ),
+                              AppCard(
+                                padding: const EdgeInsets.fromLTRB(
+                                  12,
+                                  12,
+                                  12,
+                                  8,
+                                ),
+                                child: Row(
+                                  children: [
+                                    for (final b in newBadges.take(3))
+                                      Expanded(
+                                        child: BadgeTile(
+                                          title: b.achievement.title,
+                                          icon: b.achievement.icon,
+                                          tier: b.achievement.tier.name,
+                                          earned: true,
+                                          progress: 1,
+                                          onTap: () =>
+                                              context.push(Routes.achievements),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             if (record != null) ...[
                               const SizedBox(height: 20),
                               const SectionHeader('Next time'),
@@ -1533,10 +1584,58 @@ class _SummaryView extends ConsumerWidget {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                child: PrimaryButton(
-                  label: 'DONE',
-                  icon: Icons.check_rounded,
-                  onPressed: () => context.go(Routes.home),
+                child: Row(
+                  children: [
+                    if (record != null)
+                      SizedBox(
+                        height: 56,
+                        child: OutlinedButton.icon(
+                          onPressed: () => showShareSheet(
+                            context,
+                            ShareCardData(
+                              headline: complete
+                                  ? 'SESSION COMPLETE'
+                                  : 'MY PT SESSION',
+                              title: state.plan.title,
+                              subtitle:
+                                  '$done of $total movements · '
+                                  '${record.duration.inMinutes} min',
+                              date: record.endTime,
+                              stats: [
+                                ShareStat(
+                                  label: 'Reps',
+                                  value: '${record.totalReps}',
+                                ),
+                                ShareStat(
+                                  label: 'Minutes',
+                                  value: '${record.duration.inMinutes}',
+                                ),
+                                ShareStat(label: 'XP', value: '$xp'),
+                                ShareStat(
+                                  label: 'Level',
+                                  value: '${level.level}',
+                                ),
+                              ],
+                              accent: complete ? 'primary' : 'cyan',
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 56),
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                          ),
+                          icon: const Icon(Icons.ios_share_rounded, size: 18),
+                          label: const Text('SHARE'),
+                        ),
+                      ),
+                    if (record != null) const SizedBox(width: 10),
+                    Expanded(
+                      child: PrimaryButton(
+                        label: 'DONE',
+                        icon: Icons.check_rounded,
+                        onPressed: () => context.go(Routes.home),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

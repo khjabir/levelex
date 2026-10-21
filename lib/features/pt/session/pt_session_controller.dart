@@ -387,6 +387,20 @@ class PtSessionController extends Notifier<PtSessionState> {
       target: state.target,
     );
     _coach.reset();
+    final cap = item.capSeconds;
+    if (cap != null) {
+      // Interval round: the clock ends the set even if the reps are short.
+      _setTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (state.paused || state.step != PtStep.active) return;
+        final next = state.secondsInSet + 1;
+        state = state.copyWith(secondsInSet: next);
+        if (next == 3 || next == 2 || next == 1) return;
+        if (cap - next == 3) _sayCue(VoiceCue.three);
+        if (cap - next == 2) _sayCue(VoiceCue.two);
+        if (cap - next == 1) _sayCue(VoiceCue.one);
+        if (next >= cap) _setDone();
+      });
+    }
     await _ensureCamera();
   }
 
@@ -484,6 +498,15 @@ class PtSessionController extends Notifier<PtSessionState> {
   /// Ends the rest early.
   void skipRest() {
     if (state.step != PtStep.rest) return;
+    if (state.plan.request.bare &&
+        state.setIndex == 0 &&
+        state.setReps.isEmpty) {
+      // Rest between interval rounds: start the next round.
+      _restTimer?.cancel();
+      state = state.copyWith(step: PtStep.intro, restRemaining: 0);
+      unawaited(beginItem());
+      return;
+    }
     _nextSet();
   }
 
@@ -565,6 +588,59 @@ class PtSessionController extends Notifier<PtSessionState> {
     }
     final nextIndex = state.index + 1;
     final next = state.items[nextIndex];
+    if (state.plan.request.bare && !skipped) {
+      // Interval flow: no intro card, rest (if any) then straight into
+      // the next round. EMOM rounds rest for whatever is left of the
+      // minute.
+      var restSeconds = item.rest.inSeconds;
+      final cap = item.capSeconds;
+      if (restSeconds == 0 && cap != null && !item.isTimed) {
+        restSeconds = (cap - state.secondsInSet).clamp(0, cap);
+      }
+      _restTimer?.cancel();
+      state = state.copyWith(
+        results: results,
+        index: nextIndex,
+        step: PtStep.rest,
+        setIndex: 0,
+        repsInSet: 0,
+        secondsInSet: 0,
+        itemReps: 0,
+        itemSeconds: 0,
+        itemMistakes: const {},
+        setReps: const [],
+        clearLoad: true,
+        restRemaining: restSeconds,
+        coachLine: restSeconds > 0
+            ? 'Round ${nextIndex + 1} of ${state.items.length}: '
+                  '${next.movement.name} next.'
+            : 'Next: ${next.movement.name}.',
+        clearCoachCue: true,
+        clearPose: true,
+        autoStartIn: 0,
+      );
+      _say(state.coachLine);
+      if (restSeconds <= 0) {
+        state = state.copyWith(step: PtStep.intro);
+        unawaited(beginItem());
+        return;
+      }
+      _restTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (state.paused || state.step != PtStep.rest) return;
+        final left = state.restRemaining - 1;
+        if (left <= 0) {
+          _restTimer?.cancel();
+          state = state.copyWith(step: PtStep.intro, restRemaining: 0);
+          unawaited(beginItem());
+        } else {
+          state = state.copyWith(restRemaining: left);
+          if (left == 3) _sayCue(VoiceCue.three);
+          if (left == 2) _sayCue(VoiceCue.two);
+          if (left == 1) _sayCue(VoiceCue.one);
+        }
+      });
+      return;
+    }
     final line = CoachVoice.beforeItem(next, first: false);
     state = state.copyWith(
       results: results,

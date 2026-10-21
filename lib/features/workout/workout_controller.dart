@@ -20,7 +20,9 @@ import '../../services/pose_detection_service.dart';
 import '../../services/storage_service.dart';
 import '../../services/voice_coach.dart';
 import '../../services/workout_service.dart';
+import '../../core/engagement/personal_best.dart';
 import 'analysis/analyzer_factory.dart';
+import 'workout_launch.dart';
 import 'analysis/body_tracker.dart';
 import 'analysis/coaching_tracker.dart';
 import 'push_up_analyzer.dart';
@@ -147,10 +149,22 @@ class WorkoutState {
     this.coachCue,
     this.mistakes = const {},
     this.verified = true,
+    this.bestReps,
+    this.launchReason,
+    this.newBest = false,
   });
 
   final WorkoutPhase phase;
   final ExerciseType exercise;
+
+  /// Personal best for this exercise before the set (reps or seconds).
+  final int? bestReps;
+
+  /// Why this set has a custom target ("Daily challenge", "Beat your best").
+  final String? launchReason;
+
+  /// This set has passed the previous personal best.
+  final bool newBest;
 
   /// Target reps, or target seconds for timed exercises.
   final int targetReps;
@@ -267,6 +281,9 @@ class WorkoutState {
     bool clearCoachCue = false,
     Map<FormStatus, int>? mistakes,
     bool? verified,
+    int? bestReps,
+    String? launchReason,
+    bool? newBest,
   }) {
     return WorkoutState(
       phase: phase ?? this.phase,
@@ -302,6 +319,9 @@ class WorkoutState {
       coachCue: clearCoachCue ? null : (coachCue ?? this.coachCue),
       mistakes: mistakes ?? this.mistakes,
       verified: verified ?? this.verified,
+      bestReps: bestReps ?? this.bestReps,
+      launchReason: launchReason ?? this.launchReason,
+      newBest: newBest ?? this.newBest,
     );
   }
 }
@@ -323,6 +343,7 @@ class WorkoutController extends Notifier<WorkoutState> {
   DateTime? _verificationStartedAt;
   String? _sessionId;
   DateTime? _startTime;
+  bool _bestAnnounced = false;
   bool _cameraReleasedByLifecycle = false;
   bool _finishing = false;
   bool _disposed = false;
@@ -417,8 +438,13 @@ class WorkoutController extends Notifier<WorkoutState> {
     }
 
     final settings = ref.read(settingsProvider);
-    final exercise = settings.selectedExercise;
-    final target = settings.targetFor(exercise);
+    final launch = ref.read(workoutLaunchProvider.notifier).consume();
+    final exercise = launch?.exercise ?? settings.selectedExercise;
+    final target = launch?.target ?? settings.targetFor(exercise);
+    final best = PersonalBests.forExercise(
+      ref.read(sessionsProvider),
+      exercise,
+    )?.best;
     _analyzer = ExerciseAnalyzerFactory.create(
       exercise,
       thresholds: PushUpThresholds.forSensitivity(settings.formSensitivity),
@@ -426,7 +452,14 @@ class WorkoutController extends Notifier<WorkoutState> {
     );
     _sessionId = WorkoutService.newSessionId();
     _startTime = DateTime.now();
-    state = state.copyWith(targetReps: target, exercise: exercise);
+    _bestAnnounced = false;
+    state = state.copyWith(
+      targetReps: target,
+      exercise: exercise,
+      bestReps: best,
+      launchReason: launch?.reason,
+      newBest: false,
+    );
 
     final opened = await _openCamera();
     if (!opened) return;
@@ -883,14 +916,21 @@ class WorkoutController extends Notifier<WorkoutState> {
 
   void _onRepCounted(int count) {
     final settings = ref.read(settingsProvider);
+    final best = state.bestReps;
+    final beatBest = best != null && count > best && !_bestAnnounced;
+    if (beatBest) {
+      _bestAnnounced = true;
+      state = state.copyWith(newBest: true);
+      _say(VoiceCue.trainer, label: 'New personal best!');
+    }
     if (state.exercise.isTimed) {
       final remaining = state.targetReps - count;
       if (remaining > 0 && remaining <= 3) {
         _say(_countdownCue(remaining));
-      } else if (count % 10 == 0) {
+      } else if (count % 10 == 0 && !beatBest) {
         _say(VoiceCue.secondsHeld, count: count);
       }
-    } else {
+    } else if (!beatBest) {
       _say(VoiceCue.rep, count: count);
     }
     unawaited(

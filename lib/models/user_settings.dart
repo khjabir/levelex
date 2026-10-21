@@ -47,6 +47,21 @@ enum WeightUnit {
       values.firstWhere((u) => u.name == name, orElse: () => kg);
 }
 
+/// Which 3D guide to draw.
+enum GuideQuality {
+  auto('Auto', 'Detailed body, or the lite mannequin on low-memory phones.'),
+  detailed('Detailed', 'Full body with the working muscles lit.'),
+  lite('Lite', 'Capsule mannequin: lightest on memory and battery.');
+
+  const GuideQuality(this.label, this.description);
+
+  final String label;
+  final String description;
+
+  static GuideQuality fromName(String? name) =>
+      values.firstWhere((q) => q.name == name, orElse: () => auto);
+}
+
 /// All user-configurable preferences. Immutable; use [copyWith] to change.
 class UserSettings {
   const UserSettings({
@@ -76,6 +91,12 @@ class UserSettings {
     this.targets = const {},
     this.showTrackingDetails = false,
     this.weightUnit = WeightUnit.kg,
+    this.guideQuality = GuideQuality.auto,
+    this.weeklyGoal = 3,
+    this.restWeekdays = const {},
+    this.nudgeEnabled = true,
+    this.nudgeTime = const ReminderTime(hour: 19, minute: 30),
+    this.achievementsSeen = const {},
   });
 
   final int pushUpsPerSession;
@@ -118,6 +139,22 @@ class UserSettings {
   /// Unit for loads in the lift log and MY PT.
   final WeightUnit weightUnit;
 
+  /// Detailed body or lite mannequin for the 3D guide.
+  final GuideQuality guideQuality;
+
+  /// Active days aimed for each week (1–14).
+  final int weeklyGoal;
+
+  /// Weekdays (DateTime.monday … sunday) that never break the streak.
+  final Set<int> restWeekdays;
+
+  /// Evening "streak at risk" nudge when nothing was done yet today.
+  final bool nudgeEnabled;
+  final ReminderTime nudgeTime;
+
+  /// Achievement ids already shown to the user as "new".
+  final Set<String> achievementsSeen;
+
   /// Target for [type].
   int targetFor(ExerciseType type) {
     if (type == ExerciseType.pushUp) return pushUpsPerSession;
@@ -149,6 +186,12 @@ class UserSettings {
     Map<ExerciseType, int>? targets,
     bool? showTrackingDetails,
     WeightUnit? weightUnit,
+    GuideQuality? guideQuality,
+    int? weeklyGoal,
+    Set<int>? restWeekdays,
+    bool? nudgeEnabled,
+    ReminderTime? nudgeTime,
+    Set<String>? achievementsSeen,
   }) {
     return UserSettings(
       pushUpsPerSession: pushUpsPerSession ?? this.pushUpsPerSession,
@@ -169,6 +212,12 @@ class UserSettings {
       targets: targets ?? this.targets,
       showTrackingDetails: showTrackingDetails ?? this.showTrackingDetails,
       weightUnit: weightUnit ?? this.weightUnit,
+      guideQuality: guideQuality ?? this.guideQuality,
+      weeklyGoal: weeklyGoal ?? this.weeklyGoal,
+      restWeekdays: restWeekdays ?? this.restWeekdays,
+      nudgeEnabled: nudgeEnabled ?? this.nudgeEnabled,
+      nudgeTime: nudgeTime ?? this.nudgeTime,
+      achievementsSeen: achievementsSeen ?? this.achievementsSeen,
     );
   }
 
@@ -191,6 +240,12 @@ class UserSettings {
     'targets': {for (final e in targets.entries) e.key.id: e.value},
     'showTrackingDetails': showTrackingDetails,
     'weightUnit': weightUnit.name,
+    'guideQuality': guideQuality.name,
+    'weeklyGoal': weeklyGoal,
+    'restWeekdays': restWeekdays.toList()..sort(),
+    'nudgeEnabled': nudgeEnabled,
+    'nudgeMinutes': nudgeTime.minutesSinceMidnight,
+    'achievementsSeen': achievementsSeen.toList()..sort(),
   };
 
   factory UserSettings.fromMap(Map<String, dynamic> map) {
@@ -249,6 +304,30 @@ class UserSettings {
       showTrackingDetails:
           (map['showTrackingDetails'] as bool?) ?? defaults.showTrackingDetails,
       weightUnit: WeightUnit.fromName(map['weightUnit'] as String?),
+      guideQuality: GuideQuality.fromName(map['guideQuality'] as String?),
+      weeklyGoal: ((map['weeklyGoal'] as int?) ?? defaults.weeklyGoal).clamp(
+        1,
+        14,
+      ),
+      restWeekdays: switch (map['restWeekdays']) {
+        final List raw => {
+          for (final v in raw)
+            if (v is int && v >= 1 && v <= 7) v,
+        },
+        _ => const {},
+      },
+      nudgeEnabled: (map['nudgeEnabled'] as bool?) ?? defaults.nudgeEnabled,
+      nudgeTime: ReminderTime.fromMinutes(
+        (map['nudgeMinutes'] as int?) ??
+            defaults.nudgeTime.minutesSinceMidnight,
+      ),
+      achievementsSeen: switch (map['achievementsSeen']) {
+        final List raw => {
+          for (final v in raw)
+            if (v is String) v,
+        },
+        _ => const {},
+      },
     );
   }
 
