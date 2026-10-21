@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import '../core/utils/reminder_calculator.dart';
+import '../features/pt/data/pt_repository.dart';
 import '../models/exercise.dart';
 import '../models/form_status.dart';
 import '../models/face_template.dart';
@@ -15,11 +16,15 @@ class WorkoutService {
   WorkoutService({
     required this.sessions,
     required this.settings,
+    this.pt,
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
   final SessionRepository sessions;
   final SettingsRepository settings;
+
+  /// MY PT sessions also cover reminders.
+  final PtRepository? pt;
   final DateTime Function() _clock;
   static const _uuid = Uuid();
 
@@ -36,6 +41,7 @@ class WorkoutService {
     DateTime? endTime,
     ExerciseType exercise = ExerciseType.pushUp,
     Map<FormStatus, int> mistakes = const {},
+    bool verified = true,
   }) async {
     final session = WorkoutSession(
       id: id,
@@ -49,6 +55,7 @@ class WorkoutService {
       formScore: formScore,
       exercise: exercise,
       mistakes: mistakes,
+      verified: verified,
     );
     await sessions.upsert(session);
     await settings.saveDraft(null);
@@ -103,6 +110,7 @@ class WorkoutService {
         evaluatedUntil: evaluatedUntil,
         now: current,
         sessions: existing,
+        ptRecords: pt?.records() ?? const [],
       );
       final alreadyRecorded = {
         for (final s in existing)

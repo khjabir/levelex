@@ -283,31 +283,34 @@ class Bone {
 abstract final class Rig {
   static const torso = 0.50;
   static const neck = 0.07;
-  static const headOffset = 0.15;
-  static const headRadius = 0.11;
+  static const headOffset = 0.16;
+  static const headRadius = 0.105;
   static const shoulderHalf = 0.19;
   static const upperArm = 0.30;
-  static const forearm = 0.27;
+  static const forearm = 0.26;
+  static const hand = 0.08;
   static const hipHalf = 0.10;
   static const thigh = 0.45;
   static const shin = 0.43;
-  static const foot = 0.12;
+  static const foot = 0.14;
 
   static const bones = <Bone>[
-    Bone('pelvis', 'chest', 0.17, part: 'torso'),
-    Bone('chest', 'neck', 0.10, part: 'torso'),
-    Bone('shoulderL', 'shoulderR', 0.11, part: 'torso'),
-    Bone('hipL', 'hipR', 0.12, part: 'hips'),
-    Bone('shoulderL', 'elbowL', 0.085, part: 'arms'),
-    Bone('elbowL', 'wristL', 0.07, part: 'arms'),
-    Bone('shoulderR', 'elbowR', 0.085, part: 'arms'),
-    Bone('elbowR', 'wristR', 0.07, part: 'arms'),
-    Bone('hipL', 'kneeL', 0.12, part: 'legs'),
-    Bone('kneeL', 'ankleL', 0.09, part: 'legs'),
-    Bone('ankleL', 'toeL', 0.07, part: 'legs'),
-    Bone('hipR', 'kneeR', 0.12, part: 'legs'),
-    Bone('kneeR', 'ankleR', 0.09, part: 'legs'),
-    Bone('ankleR', 'toeR', 0.07, part: 'legs'),
+    Bone('pelvis', 'chest', 0.19, part: 'torso'),
+    Bone('chest', 'neck', 0.085, part: 'torso'),
+    Bone('shoulderL', 'shoulderR', 0.12, part: 'torso'),
+    Bone('hipL', 'hipR', 0.15, part: 'hips'),
+    Bone('shoulderL', 'elbowL', 0.095, part: 'arms'),
+    Bone('elbowL', 'wristL', 0.075, part: 'arms'),
+    Bone('wristL', 'handL', 0.07, part: 'arms'),
+    Bone('shoulderR', 'elbowR', 0.095, part: 'arms'),
+    Bone('elbowR', 'wristR', 0.075, part: 'arms'),
+    Bone('wristR', 'handR', 0.07, part: 'arms'),
+    Bone('hipL', 'kneeL', 0.14, part: 'legs'),
+    Bone('kneeL', 'ankleL', 0.10, part: 'legs'),
+    Bone('ankleL', 'toeL', 0.075, part: 'legs'),
+    Bone('hipR', 'kneeR', 0.14, part: 'legs'),
+    Bone('kneeR', 'ankleR', 0.10, part: 'legs'),
+    Bone('ankleR', 'toeR', 0.075, part: 'legs'),
   ];
 
   static Map<String, Vec3> solve(RigPose p) {
@@ -335,14 +338,18 @@ abstract final class Rig {
         Mat3.rotX(-p.shoulderFlexL) *
         Mat3.rotY(p.armRotL);
     final elL = limb(raL, shL, upperArm);
-    final wrL = limb(raL * Mat3.rotX(-p.elbowL), elL, forearm);
+    final rfL = raL * Mat3.rotX(-p.elbowL);
+    final wrL = limb(rfL, elL, forearm);
+    final haL = limb(rfL, wrL, hand);
     final raR =
         rs *
         Mat3.rotZ(-p.shoulderAbdR) *
         Mat3.rotX(-p.shoulderFlexR) *
         Mat3.rotY(-p.armRotR);
     final elR = limb(raR, shR, upperArm);
-    final wrR = limb(raR * Mat3.rotX(-p.elbowR), elR, forearm);
+    final rfR = raR * Mat3.rotX(-p.elbowR);
+    final wrR = limb(rfR, elR, forearm);
+    final haR = limb(rfR, wrR, hand);
 
     final hipL = pelvis + r0.apply(const Vec3(hipHalf, 0, 0));
     final hipR = pelvis + r0.apply(const Vec3(-hipHalf, 0, 0));
@@ -350,12 +357,18 @@ abstract final class Rig {
     final knL = limb(rtL, hipL, thigh);
     final rsL = rtL * Mat3.rotX(p.kneeL);
     final anL = limb(rsL, knL, shin);
-    final toL = anL + r0.apply(const Vec3(0, -0.03, foot));
+    final toL =
+        anL +
+        rsL.apply(const Vec3(0, -0.04, 0)) +
+        r0.apply(const Vec3(0, 0, foot));
     final rtR = r0 * Mat3.rotZ(-p.hipAbdR) * Mat3.rotX(-p.hipFlexR);
     final knR = limb(rtR, hipR, thigh);
     final rsR = rtR * Mat3.rotX(p.kneeR);
     final anR = limb(rsR, knR, shin);
-    final toR = anR + r0.apply(const Vec3(0, -0.03, foot));
+    final toR =
+        anR +
+        rsR.apply(const Vec3(0, -0.04, 0)) +
+        r0.apply(const Vec3(0, 0, foot));
 
     final joints = <String, Vec3>{
       'pelvis': pelvis,
@@ -368,6 +381,8 @@ abstract final class Rig {
       'elbowR': elR,
       'wristL': wrL,
       'wristR': wrR,
+      'handL': haL,
+      'handR': haR,
       'hipL': hipL,
       'hipR': hipR,
       'kneeL': knL,
@@ -449,4 +464,35 @@ class MannequinClip {
     }
     return frames.first;
   }
+}
+
+/// World-space extents of a clip, used to frame the camera so every pose of
+/// the clip fills the canvas without the view zooming in and out mid-rep.
+class MannequinFrame {
+  const MannequinFrame({required this.height, required this.halfWidth});
+
+  /// Highest joint above the floor across the poses.
+  final double height;
+
+  /// Largest horizontal distance of any joint from the figure's centre line,
+  /// so the fit holds for any camera yaw.
+  final double halfWidth;
+
+  factory MannequinFrame.ofPoses(Iterable<RigPose> poses) {
+    var maxY = 0.0, maxR = 0.0;
+    for (final pose in poses) {
+      for (final v in Rig.solve(pose).values) {
+        if (v.y > maxY) maxY = v.y;
+        final r = math.sqrt(v.x * v.x + v.z * v.z);
+        if (r > maxR) maxR = r;
+      }
+    }
+    return MannequinFrame(
+      height: math.max(maxY, 0.5),
+      halfWidth: math.max(maxR, 0.3),
+    );
+  }
+
+  factory MannequinFrame.ofClip(MannequinClip clip) =>
+      MannequinFrame.ofPoses(clip.frames);
 }

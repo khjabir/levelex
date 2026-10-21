@@ -2,12 +2,12 @@ import '../../../core/constants/app_constants.dart';
 import '../../../models/exercise.dart';
 import '../../../models/form_status.dart';
 import '../../../models/pose_result.dart';
-import '../../workout/analysis/analyzer_factory.dart';
-import '../../workout/analysis/body_tracker.dart';
-import '../../workout/analysis/exercise_analyzer.dart';
-import '../../workout/analysis/rep_cycle_counter.dart';
-import '../../workout/analysis/tracking_diagnostics.dart';
-import '../models/movement.dart';
+import 'analyzer_factory.dart';
+import 'body_tracker.dart';
+import 'exercise_analyzer.dart';
+import 'rep_cycle_counter.dart';
+import 'tracking_diagnostics.dart';
+import 'tracking_spec.dart';
 
 /// Landmarks that define a [JointKind] angle on one side.
 (LandmarkType, LandmarkType, LandmarkType) jointTriple(
@@ -26,6 +26,7 @@ class GenericAngleAnalyzer extends CycleExerciseAnalyzer {
   GenericAngleAnalyzer({
     required this.spec,
     required this.label,
+    this.exerciseType,
     super.thresholds = const PushUpThresholds(),
     int? targetReps,
   }) : super(
@@ -48,8 +49,11 @@ class GenericAngleAnalyzer extends CycleExerciseAnalyzer {
   final AngleTracking spec;
   final String label;
 
+  /// Set when this analyzer backs one of the built-in exercises.
+  final ExerciseType? exerciseType;
+
   @override
-  ExerciseType? get type => null;
+  ExerciseType? get type => exerciseType;
 
   @override
   String get diagnosticsLabel => label;
@@ -69,16 +73,18 @@ class GenericAngleAnalyzer extends CycleExerciseAnalyzer {
 
   @override
   double? signal(PoseResult pose) {
-    var sum = 0.0;
-    var n = 0;
+    final values = <double>[];
     for (final side in _sides(pose)) {
       final (a, b, c) = jointTriple(spec.joint, side);
       final angle = pose.jointAngle(a, b, c);
-      if (angle == null) continue;
-      sum += angle;
-      n++;
+      if (angle != null) values.add(angle);
     }
-    return n == 0 ? null : sum / n;
+    if (values.isEmpty) return null;
+    return switch (spec.aggregate) {
+      SideAggregate.mean => values.reduce((x, y) => x + y) / values.length,
+      SideAggregate.min => values.reduce((x, y) => x < y ? x : y),
+      SideAggregate.max => values.reduce((x, y) => x > y ? x : y),
+    };
   }
 
   @override
@@ -109,12 +115,14 @@ class GenericHoldAnalyzer implements ExerciseAnalyzer {
   GenericHoldAnalyzer({
     required this.spec,
     required this.label,
+    this.exerciseType,
     this.thresholds = const PushUpThresholds(),
     this.targetSeconds,
   }) : tracker = BodyTracker(presenceConfidence: thresholds.presenceConfidence);
 
   final HoldTracking spec;
   final String label;
+  final ExerciseType? exerciseType;
   final PushUpThresholds thresholds;
   final int? targetSeconds;
   final BodyTracker tracker;
@@ -130,7 +138,7 @@ class GenericHoldAnalyzer implements ExerciseAnalyzer {
   static const _maxCreditedGap = Duration(milliseconds: 400);
 
   @override
-  ExerciseType? get type => null;
+  ExerciseType? get type => exerciseType;
 
   @override
   String get diagnosticsLabel => label;

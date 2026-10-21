@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:levelex/core/utils/date_utils.dart';
 import 'package:levelex/core/utils/stats_calculator.dart';
+import 'package:levelex/features/pt/models/movement.dart';
+import 'package:levelex/features/pt/models/pt_record.dart';
+import 'package:levelex/features/pt/models/workout_plan.dart';
 import 'package:levelex/models/exercise.dart';
 import 'package:levelex/models/workout_session.dart';
 
@@ -21,6 +24,32 @@ WorkoutSession session(
         (reps >= target ? SessionStatus.completed : SessionStatus.incomplete),
   );
 }
+
+PtRecord ptRecord(
+  DateTime start, {
+  Duration length = const Duration(minutes: 30),
+  bool verified = true,
+  bool finished = true,
+}) => PtRecord(
+  id: 'pt-${start.toIso8601String()}',
+  startTime: start,
+  endTime: start.add(length),
+  mode: WorkoutMode.fullBody,
+  plannedMinutes: length.inMinutes,
+  items: [
+    PtItemResult(
+      movementId: 'push_up',
+      phase: PlanPhase.main,
+      setsPlanned: 3,
+      setsDone: finished ? 3 : 1,
+      reps: finished ? 30 : 10,
+      seconds: 0,
+      skipped: false,
+    ),
+  ],
+  verified: verified,
+  plannedItems: 1,
+);
 
 WorkoutSession skipped(DateTime at) => WorkoutSession(
   id: 'skip-${at.toIso8601String()}',
@@ -68,6 +97,25 @@ void main() {
       expect(stats.totalPushUps, 12);
       expect(stats.completedSessions, 2);
       expect(stats.attemptedSessions, 2);
+    });
+
+    test('unverified sets add reps but never complete a day', () {
+      final verified = session(DateTime(2026, 3, 9, 9));
+      final bypassed = WorkoutSession(
+        id: 'bypass',
+        startTime: DateTime(2026, 3, 10, 9),
+        endTime: DateTime(2026, 3, 10, 9, 1),
+        targetReps: 10,
+        completedReps: 10,
+        status: SessionStatus.completed,
+        verified: false,
+      );
+      final stats = StatsCalculator.statsForDay([bypassed], today);
+      expect(stats.totalPushUps, 10);
+      expect(stats.completedSessions, 0);
+      expect(stats.attemptedSessions, 1);
+      expect(stats.isCompletedDay, isFalse);
+      expect(StatsCalculator.currentStreak([verified, bypassed], today), 1);
     });
 
     test('skipped sessions can be excluded', () {
@@ -184,6 +232,42 @@ void main() {
         session(DateTime(2026, 3, 10, 0, 1)),
       ];
       expect(StatsCalculator.currentStreak(sessions, today), 2);
+    });
+  });
+
+  group('MY PT and streaks', () {
+    test('a finished, verified PT session keeps the streak alive', () {
+      final sessions = [
+        session(DateTime(2026, 3, 8, 9)),
+        session(DateTime(2026, 3, 10, 9)),
+      ];
+      final pt = [ptRecord(DateTime(2026, 3, 9, 18))];
+      expect(StatsCalculator.currentStreak(sessions, today), 1);
+      expect(StatsCalculator.currentStreak(sessions, today, ptRecords: pt), 3);
+      expect(StatsCalculator.longestStreak(sessions, ptRecords: pt), 3);
+    });
+
+    test('unverified or mostly unfinished PT sessions do not count', () {
+      final pt = [
+        ptRecord(DateTime(2026, 3, 10, 9), verified: false),
+        ptRecord(DateTime(2026, 3, 9, 9), finished: false),
+      ];
+      expect(StatsCalculator.currentStreak(const [], today, ptRecords: pt), 0);
+    });
+  });
+
+  group('MY PT in daily stats', () {
+    test('PT sessions add a history day, reps and a completed day', () {
+      final pt = [
+        ptRecord(DateTime(2026, 3, 9, 18)),
+        ptRecord(DateTime(2026, 3, 9, 20), verified: false),
+      ];
+      final byDay = StatsCalculator.statsByDay(const [], ptRecords: pt);
+      final day = byDay[DateTime(2026, 3, 9)]!;
+      expect(day.ptSessions, 2);
+      expect(day.ptCompletedSessions, 1);
+      expect(day.totalPushUps, 60);
+      expect(day.isCompletedDay, isTrue);
     });
   });
 

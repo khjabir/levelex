@@ -4,6 +4,26 @@ import 'package:levelex/features/pt/mannequin/rig.dart';
 import 'package:levelex/features/pt/models/movement_library.dart';
 
 void main() {
+  group('MannequinFrame', () {
+    test('a push-up clip is low and wide, a standing clip tall and narrow', () {
+      final stand = MannequinFrame.ofClip(MannequinClips.clip('stand'));
+      final push = MannequinFrame.ofClip(MannequinClips.clip('push_up'));
+      expect(stand.height, greaterThan(1.5));
+      expect(push.height, lessThan(stand.height * 0.6));
+      expect(push.halfWidth, greaterThan(stand.halfWidth));
+    });
+
+    test('covers every keyframe of a clip', () {
+      final jack = MannequinClips.clip('jumping_jack');
+      final whole = MannequinFrame.ofClip(jack);
+      for (final f in jack.frames) {
+        final one = MannequinFrame.ofPoses([f]);
+        expect(whole.height, greaterThanOrEqualTo(one.height - 1e-9));
+        expect(whole.halfWidth, greaterThanOrEqualTo(one.halfWidth - 1e-9));
+      }
+    });
+  });
+
   group('Rig', () {
     test('standing figure has feet on the floor and head on top', () {
       final j = Rig.solve(const RigPose.sym());

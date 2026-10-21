@@ -33,10 +33,15 @@ class WorkoutOutcome {
     required this.report,
     this.mistakes = const {},
     this.xpEarned = 0,
+    this.verified = true,
   });
 
   final WorkoutSession? session;
   final String report;
+
+  /// False when the face check was skipped: the set is saved but does not
+  /// count towards the streak or XP.
+  final bool verified;
 
   /// Coaching mistakes during the set (status → episodes).
   final Map<FormStatus, int> mistakes;
@@ -141,6 +146,7 @@ class WorkoutState {
     this.report,
     this.coachCue,
     this.mistakes = const {},
+    this.verified = true,
   });
 
   final WorkoutPhase phase;
@@ -210,6 +216,9 @@ class WorkoutState {
   /// Mistakes so far in this set.
   final Map<FormStatus, int> mistakes;
 
+  /// False once the user chose to skip the face check.
+  final bool verified;
+
   double get progress => targetReps == 0 ? 0 : repCount / targetReps;
   bool get isRunning =>
       phase == WorkoutPhase.calibrating ||
@@ -257,6 +266,7 @@ class WorkoutState {
     FormStatus? coachCue,
     bool clearCoachCue = false,
     Map<FormStatus, int>? mistakes,
+    bool? verified,
   }) {
     return WorkoutState(
       phase: phase ?? this.phase,
@@ -291,6 +301,7 @@ class WorkoutState {
       report: report ?? this.report,
       coachCue: clearCoachCue ? null : (coachCue ?? this.coachCue),
       mistakes: mistakes ?? this.mistakes,
+      verified: verified ?? this.verified,
     );
   }
 }
@@ -358,7 +369,9 @@ class WorkoutController extends Notifier<WorkoutState> {
   // ---------------------------------------------------------------------------
 
   /// Requests camera permission, opens the camera and begins verification.
-  Future<void> start() async {
+  /// With [bypassIdentity] the face check is skipped: the set is tracked and
+  /// saved but marked unverified (no streak, no XP).
+  Future<void> start({bool bypassIdentity = false}) async {
     if (state.phase != WorkoutPhase.idle && state.phase != WorkoutPhase.error) {
       return;
     }
@@ -374,9 +387,11 @@ class WorkoutController extends Notifier<WorkoutState> {
       repCount: 0,
       faceStatus: FaceVerificationStatus.pending,
       pausedByIdentity: false,
+      verified: !bypassIdentity,
     );
 
-    if (!ref.read(workoutServiceProvider).hasRegisteredFace) {
+    if (!bypassIdentity &&
+        !ref.read(workoutServiceProvider).hasRegisteredFace) {
       state = state.copyWith(
         phase: WorkoutPhase.error,
         faceStatus: FaceVerificationStatus.notRegistered,
@@ -415,7 +430,13 @@ class WorkoutController extends Notifier<WorkoutState> {
 
     final opened = await _openCamera();
     if (!opened) return;
-    await _enterVerification();
+    if (bypassIdentity) {
+      state = state.copyWith(faceStatus: FaceVerificationStatus.matched);
+      _say(VoiceCue.getInPosition, label: state.exercise.positionHint);
+      _enterCalibration();
+    } else {
+      await _enterVerification();
+    }
     // If the app went to the background while the camera was opening, pause
     // right away so the camera is never held while backgrounded.
     if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
@@ -525,8 +546,21 @@ class WorkoutController extends Notifier<WorkoutState> {
     });
   }
 
+  /// Skips the face check mid-verification. The set continues unverified.
+  void skipVerification() {
+    if (state.phase != WorkoutPhase.verifying) return;
+    _verificationTimer?.cancel();
+    state = state.copyWith(
+      verified: false,
+      faceStatus: FaceVerificationStatus.matched,
+    );
+    _say(VoiceCue.getInPosition, label: state.exercise.positionHint);
+    _enterCalibration();
+  }
+
   /// Low-rate raw frames: identity checks before and during the set.
   Future<void> _onFrame(CameraFrame frame) async {
+    if (!state.verified) return; // Bypassed: no checks at all.
     final face = _faceService;
     final template = ref.read(workoutServiceProvider).faceTemplate;
     if (face == null || template == null || _disposed) return;
@@ -1005,6 +1039,7 @@ class WorkoutController extends Notifier<WorkoutState> {
               formScore: formScore,
               exercise: state.exercise,
               mistakes: mistakes,
+              verified: state.verified,
             );
       } catch (e) {
         debugPrint('Saving session failed: $e');
@@ -1049,7 +1084,8 @@ class WorkoutController extends Notifier<WorkoutState> {
       if (analyzer != null) analyzer.diagnostics.report(),
       'camera=${state.lensDirection.name} mirror=${state.mirror} '
           'target=${state.targetReps} counted=${state.repCount}',
-      'form sensitivity=${ref.read(settingsProvider).formSensitivity.name}',
+      'form sensitivity=${ref.read(settingsProvider).formSensitivity.name} '
+          'verified=${state.verified}',
       'mistakes=${_coach.mistakes.entries.map((e) => '${e.key.name}=${e.value}').join(',')}',
     ].join('\n');
   }

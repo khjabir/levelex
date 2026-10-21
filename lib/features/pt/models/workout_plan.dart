@@ -81,6 +81,7 @@ class PtRequest {
     this.level = PtLevel.intermediate,
     this.equipment = const {},
     this.seed = 1,
+    this.quick = false,
   });
 
   final Duration duration;
@@ -94,6 +95,9 @@ class PtRequest {
   /// Changes which movements are picked; "shuffle" bumps it.
   final int seed;
 
+  /// One-tap quick workout: intros auto-start after a short countdown.
+  final bool quick;
+
   Set<MuscleGroup> get targetMuscles =>
       mode == WorkoutMode.custom ? focus : mode.muscles;
 
@@ -104,6 +108,7 @@ class PtRequest {
     PtLevel? level,
     Set<Equipment>? equipment,
     int? seed,
+    bool? quick,
   }) => PtRequest(
     duration: duration ?? this.duration,
     mode: mode ?? this.mode,
@@ -111,6 +116,7 @@ class PtRequest {
     level: level ?? this.level,
     equipment: equipment ?? this.equipment,
     seed: seed ?? this.seed,
+    quick: quick ?? this.quick,
   );
 }
 

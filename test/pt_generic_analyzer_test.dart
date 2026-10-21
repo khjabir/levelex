@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:levelex/features/pt/analysis/generic_analyzers.dart';
+import 'package:levelex/features/workout/analysis/generic_analyzers.dart';
 import 'package:levelex/features/pt/models/movement.dart';
 import 'package:levelex/features/workout/analysis/rep_cycle_counter.dart';
 import 'package:levelex/models/form_status.dart';

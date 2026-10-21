@@ -11,8 +11,21 @@ Everything is local: no backend, no account, no cloud.
 ## Features
 
 - Hourly (configurable) reminders using OS-scheduled local notifications
-- Seven exercises: push-ups, squats, jumping jacks, burpees, sit-ups, lunges
-  and a timed plank, each with its own target, picked on the home screen
+- Thirteen exercises: push-ups, squats, jumping jacks, burpees, sit-ups,
+  lunges, glute bridges, high knees, mountain climbers, tricep dips, squat
+  jumps, and timed planks and wall sits, each with its own target, picked on
+  the home screen with a live 3D guide
+- Quick workout: one tap on the home screen builds a 10-minute full-body
+  session from your equipment and walks you through it with auto-starting
+  intros
+- Challenge mode: add friends by name (optional photo), pick an exercise and
+  the rules (most reps in a time limit, or first to a target), then take
+  turns in front of the camera. Same counting and coaching for everyone, a
+  podium with the cup at the end, a hall of fame, and nothing touches your
+  own streak or XP
+- Face check is optional: skip it before a set (or during MY PT) and the set
+  is still counted, coached and saved, but marked unverified. Unverified sets
+  never extend the streak or earn XP, and the app says so before you skip
 - Training assistant: animated how-to demos for every exercise, a "common
   mistakes" gallery with the fix for each, live corrections during the set
   (go lower, slow down, hips up, chest up, arms overhead) spoken and shown on
@@ -61,7 +74,7 @@ MY PT turns Levelex into a session-based trainer. Everything runs on the
 device; the "AI" is a rule-based planner and coach, not a cloud model, so it
 works offline and nothing about you leaves the phone.
 
-- **Ask for a session**: duration (10–60 min), a standard split (Push, Pull,
+- **Ask for a session**: duration (10–60 min, or custom), a standard split (Push, Pull,
   Legs, Upper, Lower, Full body, Core, HIIT, Mobility) or a custom muscle
   focus, and your level. `WorkoutPlanner` (`lib/features/pt/planner/`) builds
   a warm-up, main block and cool-down from a catalogue of 60+ movements
@@ -72,14 +85,33 @@ works offline and nothing about you leaves the phone.
   bench, pull-up bar, bands, cable, box, cardio machines…). Attach a photo
   and a note ("blue rack by the mirror") to each item; during the session
   the "grab this" card shows your own photo and location so you know what
-  to pick up next. Photos live in the app's private folder.
+  to pick up next. "Scan with camera" photographs a machine and asks the
+  on-device ML Kit image labeler what it is (`EquipmentDetector`); it knows
+  benches, bikes, rowers and treadmills well and offers ranked best guesses
+  for the rest, with a one-tap manual fallback. Photos live in the app's
+  private folder and never leave the phone.
+- **Session length**: presets from 10 to 60 minutes or any custom length from
+  5 to 180 minutes.
 - **3D guides**: every movement is demonstrated by a procedural 3D mannequin
   (`Mannequin3D`, `lib/features/pt/mannequin/`): a forward-kinematics rig
-  driven by joint-angle keyframes, rendered with a perspective projection and
-  depth-sorted shaded capsules. Drag to orbit, double-tap to reset. No model
-  files, so it stays crisp and tiny. During tracked sets it sits in a
-  picture-in-picture corner and highlights the body part the coach is
-  correcting.
+  driven by joint-angle keyframes, rendered with a perspective projection,
+  lit depth-sorted capsules, a torso plate, hands and feet. Poses are
+  composed with a flat-back hinge helper (`MannequinClips.hinge`) so squats,
+  deadlifts, rows and push-ups show safe mechanics: hips back, chest up,
+  elbows tucked. Drag to orbit, double-tap to reset. No model files, so it
+  stays crisp and tiny. `test/preview/mannequin_preview_test.dart` renders
+  every clip to contact sheets (`MANNEQUIN_PREVIEW=<dir> flutter test
+  test/preview`) for review.
+- **Live view on every item**: the camera stays on for the whole session,
+  with the skeleton overlay, the 3D guide picture-in-picture and the coach
+  card. Rep movements are counted and corrected; the body part involved in
+  a correction turns red on the skeleton and amber on the guide. Timed
+  movements and stretches run on the clock with the camera confirming you
+  are in frame. If the camera fails, the item falls back to the guide and
+  timer only.
+- **Equipment navigation**: when a movement needs equipment you photographed,
+  the intro card shows the photo full width with your location note, and the
+  live view shows the thumbnail under the movement name.
 - **Guided flow**: intro card (guide, equipment, cues) → sets with rest
   countdowns → next movement → summary. Movements the camera can follow
   (push-ups, squats, lunges, jumping jacks, burpees, planks, sit-ups, curls,
@@ -487,17 +519,19 @@ no analytics and no network calls.
 
 ## Branding
 
-The icon and splash screen are generated from vector art drawn by a small
-CoreGraphics script (`assets/icon/*.png`) with `flutter_launcher_icons` and
-`flutter_native_splash`:
+The mark is a figure mid star-jump in the brand gradient. The icon and
+splash are generated from vector art by `tool/logo/make_logo.swift`
+(CoreGraphics) and fanned out with `flutter_launcher_icons` and
+`flutter_native_splash`; the project skill `.claude/skills/logo-creator`
+documents the whole loop, including how to try new variants:
 
 ```bash
-dart run flutter_launcher_icons
-dart run flutter_native_splash:create
+cd tool/logo && swiftc -O make_logo.swift -o make_logo && ./make_logo ../../assets/icon/icon.png figure full
+dart run flutter_launcher_icons && dart run flutter_native_splash:create
 ```
 
-The in-app mark (`BrandMark`) is drawn with a `CustomPainter`, so it stays
-crisp at any size. Fonts: Inter (OFL).
+The in-app mark (`BrandMark`) is a `CustomPainter` with the same geometry,
+so it stays crisp at any size. Fonts: Inter (OFL).
 
 ## Fonts & licenses
 

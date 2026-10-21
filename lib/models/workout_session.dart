@@ -31,6 +31,7 @@ class WorkoutSession {
     this.formScore,
     this.exercise = ExerciseType.pushUp,
     this.mistakes = const {},
+    this.verified = true,
   });
 
   final String id;
@@ -48,6 +49,10 @@ class WorkoutSession {
 
   /// Coaching mistakes during the set (status → episodes).
   final Map<FormStatus, int> mistakes;
+
+  /// The registered user was recognised before the set. Unverified sets are
+  /// saved and shown, but never count towards the streak or XP.
+  final bool verified;
 
   int get totalMistakes => mistakes.values.fold(0, (a, b) => a + b);
 
@@ -76,6 +81,7 @@ class WorkoutSession {
       formScore: formScore ?? this.formScore,
       exercise: exercise,
       mistakes: mistakes ?? this.mistakes,
+      verified: verified,
     );
   }
 
@@ -89,6 +95,7 @@ class WorkoutSession {
     'formScore': formScore,
     'exercise': exercise.id,
     'mistakes': {for (final e in mistakes.entries) e.key.name: e.value},
+    'verified': verified,
   };
 
   factory WorkoutSession.fromMap(Map<dynamic, dynamic> map) {
@@ -113,6 +120,7 @@ class WorkoutSession {
         },
         _ => const {},
       },
+      verified: (map['verified'] as bool?) ?? true,
     );
   }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/challenge/screens/challenge_play_screen.dart';
+import '../features/challenge/screens/challenge_setup_screen.dart';
 import '../features/face/face_registration_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
@@ -35,6 +37,8 @@ abstract final class Routes {
   static const ptEquipment = '/pt/equipment';
   static const ptPlan = '/pt/plan';
   static const ptSession = '/pt/session';
+  static const challenge = '/challenge';
+  static const challengePlay = '/challenge/play';
 }
 
 /// Where the app opens. Overridden at startup when a reminder launched it.
@@ -119,6 +123,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.history,
         pageBuilder: (context, state) => _page(state, const HistoryScreen()),
+      ),
+      GoRoute(
+        path: Routes.challenge,
+        pageBuilder: (context, state) =>
+            _page(state, const ChallengeSetupScreen()),
+        routes: [
+          GoRoute(
+            path: 'play',
+            pageBuilder: (context, state) => CustomTransitionPage<void>(
+              key: state.pageKey,
+              child: const ChallengePlayScreen(),
+              transitionsBuilder: (context, animation, secondary, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: Routes.pt,

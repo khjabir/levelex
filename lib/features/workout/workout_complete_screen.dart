@@ -168,6 +168,38 @@ class WorkoutCompleteScreen extends ConsumerWidget {
                                 ),
                               ),
                               const SizedBox(height: 22),
+                              if (!session.verified) ...[
+                                AppCard(
+                                  borderColor: AppColors.warning.withValues(
+                                    alpha: 0.5,
+                                  ),
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Icon(
+                                        Icons.no_accounts_outlined,
+                                        color: AppColors.warning,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          'Unverified set: saved and counted '
+                                          'in today\'s total, but it does not '
+                                          'extend your streak or earn XP '
+                                          'because the face check was skipped.',
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                color: AppColors.textPrimary,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
                               _XpCard(
                                 xp: xp,
                                 level: level,

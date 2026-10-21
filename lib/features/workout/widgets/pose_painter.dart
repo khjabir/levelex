@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../models/form_status.dart';
 import '../../../models/pose_result.dart';
 
 /// Draws a simple skeleton over the camera preview from normalised landmarks.
@@ -9,8 +10,36 @@ class PosePainter extends CustomPainter {
     required this.pose,
     required this.mirror,
     required this.good,
+    this.issue,
     this.minLikelihood = 0.3,
   });
+
+  /// Current coaching problem; the bones involved are drawn in red.
+  final FormStatus? issue;
+
+  /// Bones to flag for an issue.
+  static Set<(LandmarkType, LandmarkType)> bonesFor(FormStatus? issue) =>
+      switch (issue) {
+        FormStatus.hipsTooHigh || FormStatus.hipsTooLow => const {
+          (LandmarkType.leftShoulder, LandmarkType.leftHip),
+          (LandmarkType.rightShoulder, LandmarkType.rightHip),
+          (LandmarkType.leftHip, LandmarkType.leftKnee),
+          (LandmarkType.rightHip, LandmarkType.rightKnee),
+          (LandmarkType.leftHip, LandmarkType.rightHip),
+        },
+        FormStatus.torsoLeaning => const {
+          (LandmarkType.leftShoulder, LandmarkType.leftHip),
+          (LandmarkType.rightShoulder, LandmarkType.rightHip),
+          (LandmarkType.leftShoulder, LandmarkType.rightShoulder),
+        },
+        FormStatus.armsNotOverhead || FormStatus.goDeeper => const {
+          (LandmarkType.leftShoulder, LandmarkType.leftElbow),
+          (LandmarkType.leftElbow, LandmarkType.leftWrist),
+          (LandmarkType.rightShoulder, LandmarkType.rightElbow),
+          (LandmarkType.rightElbow, LandmarkType.rightWrist),
+        },
+        _ => const {},
+      };
 
   final PoseResult? pose;
 
@@ -45,9 +74,15 @@ class PosePainter extends CustomPainter {
     if (pose == null || !pose.hasPose) return;
 
     final color = good ? AppColors.primary : AppColors.warning;
+    final flagged = bonesFor(issue);
     final bonePaint = Paint()
       ..color = color.withValues(alpha: 0.9)
       ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final issuePaint = Paint()
+      ..color = AppColors.danger
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
     final outline = Paint()
@@ -71,7 +106,8 @@ class PosePainter extends CustomPainter {
       final p1 = _toCanvas(la, size);
       final p2 = _toCanvas(lb, size);
       canvas.drawLine(p1, p2, outline);
-      canvas.drawLine(p1, p2, bonePaint);
+      final isIssue = flagged.contains((a, b)) || flagged.contains((b, a));
+      canvas.drawLine(p1, p2, isIssue ? issuePaint : bonePaint);
     }
 
     for (final landmark in pose.landmarks.values) {
@@ -87,5 +123,6 @@ class PosePainter extends CustomPainter {
   bool shouldRepaint(covariant PosePainter oldDelegate) =>
       oldDelegate.pose != pose ||
       oldDelegate.mirror != mirror ||
-      oldDelegate.good != good;
+      oldDelegate.good != good ||
+      oldDelegate.issue != issue;
 }

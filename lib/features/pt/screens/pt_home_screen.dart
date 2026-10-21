@@ -82,6 +82,32 @@ class PtHomeScreen extends ConsumerWidget {
                               (r) => r.copyWith(duration: Duration(minutes: m)),
                             ),
                           ),
+
+                        _Choice(
+                          label: durations.contains(request.duration.inMinutes)
+                              ? 'Custom'
+                              : 'Custom · ${request.duration.inMinutes} min',
+
+                          selected: !durations.contains(
+                            request.duration.inMinutes,
+                          ),
+
+                          onTap: () async {
+                            final minutes = await _askMinutes(
+                              context,
+
+                              request.duration.inMinutes,
+                            );
+
+                            if (minutes != null) {
+                              notifier.update(
+                                (r) => r.copyWith(
+                                  duration: Duration(minutes: minutes),
+                                ),
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -223,7 +249,7 @@ class PtHomeScreen extends ConsumerWidget {
                             for (var i = 0; i < recent.length; i++) ...[
                               if (i > 0)
                                 const Divider(indent: 20, endIndent: 20),
-                              _RecordTile(record: recent[i]),
+                              PtRecordTile(record: recent[i]),
                             ],
                           ],
                         ),
@@ -237,6 +263,61 @@ class PtHomeScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Asks for a session length in minutes (5–180).
+Future<int?> _askMinutes(BuildContext context, int initial) {
+  final controller = TextEditingController(text: '$initial')
+    ..selection = TextSelection(baseOffset: 0, extentOffset: '$initial'.length);
+  String? error;
+  int? parse() {
+    final v = int.tryParse(controller.text.trim());
+    return v == null || v < 5 || v > 180 ? null : v;
+  }
+
+  return showDialog<int>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: const Text('Custom session length'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Minutes',
+            helperText: '5 to 180 minutes',
+            errorText: error,
+          ),
+          onSubmitted: (_) {
+            final v = parse();
+            if (v == null) {
+              setState(() => error = 'Enter 5–180 minutes');
+            } else {
+              Navigator.of(context).pop(v);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final v = parse();
+              if (v == null) {
+                setState(() => error = 'Enter 5–180 minutes');
+              } else {
+                Navigator.of(context).pop(v);
+              }
+            },
+            child: const Text('Use'),
+          ),
+        ],
+      ),
+    ),
+  ).whenComplete(controller.dispose);
 }
 
 class _Choice extends StatelessWidget {
@@ -371,8 +452,9 @@ class _ModeCard extends StatelessWidget {
   }
 }
 
-class _RecordTile extends StatelessWidget {
-  const _RecordTile({required this.record});
+/// One MY PT session in a list: mode, length, progress and XP.
+class PtRecordTile extends StatelessWidget {
+  const PtRecordTile({super.key, required this.record});
 
   final PtRecord record;
 
@@ -401,7 +483,7 @@ class _RecordTile extends StatelessWidget {
       ),
       subtitle: Text(
         '${DateFormat.MMMd().add_jm().format(record.startTime)} · '
-        '${record.itemsDone}/${record.items.length} movements'
+        '${record.itemsDone}/${record.itemCount} movements'
         '${record.verified ? '' : ' · not scored'}',
       ),
       trailing: xp > 0

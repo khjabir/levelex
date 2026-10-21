@@ -117,12 +117,17 @@ abstract final class CoachingLibrary {
   }
 
   static String _deeperTitle(ExerciseType e) => switch (e) {
-    ExerciseType.pushUp => 'Go lower',
-    ExerciseType.squat || ExerciseType.lunge => 'Go deeper',
+    ExerciseType.pushUp || ExerciseType.tricepDip => 'Go lower',
+    ExerciseType.squat ||
+    ExerciseType.lunge ||
+    ExerciseType.squatJump => 'Go deeper',
     ExerciseType.jumpingJack => 'Open up fully',
     ExerciseType.burpee => 'All the way down',
     ExerciseType.sitUp => 'Sit all the way up',
-    ExerciseType.plank => 'Hold the line',
+    ExerciseType.plank || ExerciseType.wallSit => 'Hold the line',
+    ExerciseType.gluteBridge => 'Hips higher',
+    ExerciseType.highKnees => 'Knees higher',
+    ExerciseType.mountainClimber => 'Knee all the way in',
   };
 
   static String _deeperInstruction(ExerciseType e) => switch (e) {
@@ -143,15 +148,32 @@ abstract final class CoachingLibrary {
       'Curl all the way up until your torso is upright, then lower slowly.',
     ExerciseType.plank =>
       'Keep your body straight and still so the timer keeps running.',
+    ExerciseType.gluteBridge =>
+      'Drive the hips up until shoulders, hips and knees form one line.',
+    ExerciseType.wallSit =>
+      'Slide down until the thighs are parallel; the clock only runs there.',
+    ExerciseType.highKnees => 'Bring each knee all the way up to hip height.',
+    ExerciseType.mountainClimber =>
+      'Drive the knee right in under the chest on every rep.',
+    ExerciseType.tricepDip =>
+      'That one was too shallow. Lower until the elbows reach about 90°.',
+    ExerciseType.squatJump =>
+      'Squat to parallel before you jump; half squats do not count.',
   };
 
   static String _deeperSpoken(ExerciseType e) => switch (e) {
     ExerciseType.pushUp => 'Go lower, chest to the floor',
-    ExerciseType.squat || ExerciseType.lunge => 'Go deeper',
+    ExerciseType.squat ||
+    ExerciseType.lunge ||
+    ExerciseType.squatJump => 'Go deeper',
     ExerciseType.jumpingJack => 'Open up, hands overhead',
     ExerciseType.burpee => 'All the way down',
     ExerciseType.sitUp => 'All the way up',
-    ExerciseType.plank => 'Hold the line',
+    ExerciseType.plank || ExerciseType.wallSit => 'Hold the line',
+    ExerciseType.gluteBridge => 'Hips higher',
+    ExerciseType.highKnees => 'Knees higher',
+    ExerciseType.mountainClimber => 'Knee all the way in',
+    ExerciseType.tricepDip => 'Go lower',
   };
 
   /// Tip for the post-set summary.

@@ -51,6 +51,12 @@ abstract final class LevelSystem {
     ExerciseType.sitUp => 6,
     ExerciseType.jumpingJack => 3,
     ExerciseType.plank => 2,
+    ExerciseType.gluteBridge => 5,
+    ExerciseType.wallSit => 2,
+    ExerciseType.highKnees => 2,
+    ExerciseType.mountainClimber => 3,
+    ExerciseType.tricepDip => 8,
+    ExerciseType.squatJump => 9,
   };
 
   /// Bonus for finishing the whole set.
@@ -71,7 +77,7 @@ abstract final class LevelSystem {
 
   /// XP a session is worth.
   static int xpForSession(WorkoutSession s) {
-    if (s.skipped || s.completedReps <= 0) return 0;
+    if (s.skipped || s.completedReps <= 0 || !s.verified) return 0;
     var xp = s.completedReps * xpPerUnit(s.exercise);
     if (s.isCompleted) xp += completionBonus;
     return xp;

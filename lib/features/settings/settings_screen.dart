@@ -14,6 +14,7 @@ import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
 import '../face/face_providers.dart';
 import '../notifications/reminder_controller.dart';
+import '../challenge/challenge_providers.dart';
 import '../pt/pt_providers.dart';
 import '../workout/exercise_icons.dart';
 import '../workout/workout_intro_screen.dart';
@@ -109,6 +110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(sessionsProvider.notifier).clearHistory();
     await ref.read(ptRecordsProvider.notifier).clear();
     await ref.read(gymProfileProvider.notifier).clear();
+    await ref.read(challengeRecordsProvider.notifier).clear();
     await ref.read(settingsProvider.notifier).reset();
     if (!mounted) return;
     context.go(Routes.onboarding);

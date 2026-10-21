@@ -179,3 +179,12 @@ class LungeAnalyzer extends _StandingLegAnalyzer {
     return false;
   }
 }
+
+/// Squat jumps: the same knee-angle cycle as a squat; the flight phase is
+/// just a fast return to "rest". Reported as its own exercise.
+class SquatJumpAnalyzer extends SquatAnalyzer {
+  SquatJumpAnalyzer({super.thresholds, super.targetReps});
+
+  @override
+  ExerciseType get type => ExerciseType.squatJump;
+}

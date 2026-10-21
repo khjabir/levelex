@@ -1,9 +1,39 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:levelex/features/pt/data/pt_repository.dart';
+import 'package:levelex/features/pt/models/movement.dart';
+import 'package:levelex/features/pt/models/pt_record.dart';
+import 'package:levelex/features/pt/models/workout_plan.dart';
 import 'package:levelex/models/reminder_time.dart';
 import 'package:levelex/models/user_settings.dart';
 import 'package:levelex/models/workout_session.dart';
 import 'package:levelex/services/storage_service.dart';
 import 'package:levelex/services/workout_service.dart';
+
+PtRecord ptRecord(
+  DateTime start, {
+  Duration length = const Duration(minutes: 30),
+  bool verified = true,
+  bool finished = true,
+}) => PtRecord(
+  id: 'pt-${start.toIso8601String()}',
+  startTime: start,
+  endTime: start.add(length),
+  mode: WorkoutMode.fullBody,
+  plannedMinutes: length.inMinutes,
+  items: [
+    PtItemResult(
+      movementId: 'push_up',
+      phase: PlanPhase.main,
+      setsPlanned: 3,
+      setsDone: finished ? 3 : 1,
+      reps: finished ? 30 : 10,
+      seconds: 0,
+      skipped: false,
+    ),
+  ],
+  verified: verified,
+  plannedItems: 1,
+);
 
 void main() {
   late InMemorySessionRepository sessions;
@@ -46,6 +76,19 @@ void main() {
       expect(session.endTime, now);
       expect(settings.draft, isNull);
       expect(sessions.all().single.id, 'a');
+    });
+
+    test('recordWorkout stores the verified flag', () async {
+      final session = await service.recordWorkout(
+        id: 'u1',
+        startTime: DateTime(2026, 3, 10, 9),
+        targetReps: 10,
+        reps: 10,
+        verified: false,
+      );
+      expect(session.verified, isFalse);
+      expect(WorkoutSession.fromMap(session.toMap()).verified, isFalse);
+      expect(sessions.all().single.verified, isFalse);
     });
 
     test('marks incomplete when short of the target', () async {
@@ -126,6 +169,39 @@ void main() {
         DateTime(2026, 3, 10, 9),
         DateTime(2026, 3, 10, 11),
       ]);
+    });
+
+    test('a verified MY PT session covers every window it overlaps', () async {
+      final pt = InMemoryPtRepository();
+      await pt.upsertRecord(
+        ptRecord(
+          DateTime(2026, 3, 10, 9, 40),
+          length: const Duration(minutes: 40),
+        ),
+      );
+      service = WorkoutService(
+        sessions: sessions,
+        settings: settings,
+        pt: pt,
+        clock: () => now,
+      );
+      final created = await service.evaluateSkippedSessions(hourlySettings);
+      expect(created.map((s) => s.startTime), [DateTime(2026, 3, 10, 11)]);
+    });
+
+    test('an unverified MY PT session does not cover a reminder', () async {
+      final pt = InMemoryPtRepository();
+      await pt.upsertRecord(
+        ptRecord(DateTime(2026, 3, 10, 10, 10), verified: false),
+      );
+      service = WorkoutService(
+        sessions: sessions,
+        settings: settings,
+        pt: pt,
+        clock: () => now,
+      );
+      final created = await service.evaluateSkippedSessions(hourlySettings);
+      expect(created.length, 3);
     });
 
     test('records nothing when tracking is off but still advances', () async {

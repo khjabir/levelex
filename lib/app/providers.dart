@@ -7,6 +7,7 @@ import '../core/levels/level_system.dart';
 import '../core/utils/date_utils.dart';
 import '../core/utils/reminder_calculator.dart';
 import '../core/utils/stats_calculator.dart';
+import '../features/pt/models/pt_record.dart';
 import '../features/pt/pt_providers.dart';
 import '../models/daily_stats.dart';
 import '../models/exercise.dart';
@@ -55,6 +56,7 @@ final workoutServiceProvider = Provider<WorkoutService>(
   (ref) => WorkoutService(
     sessions: ref.watch(sessionRepositoryProvider),
     settings: ref.watch(settingsRepositoryProvider),
+    pt: ref.watch(ptRepositoryProvider),
   ),
 );
 
@@ -106,6 +108,7 @@ class SessionsNotifier extends Notifier<List<WorkoutSession>> {
     double? formScore,
     ExerciseType exercise = ExerciseType.pushUp,
     Map<FormStatus, int> mistakes = const {},
+    bool verified = true,
   }) async {
     final session = await _service.recordWorkout(
       id: id,
@@ -115,6 +118,7 @@ class SessionsNotifier extends Notifier<List<WorkoutSession>> {
       formScore: formScore,
       exercise: exercise,
       mistakes: mistakes,
+      verified: verified,
     );
     refresh();
     return session;
@@ -223,6 +227,7 @@ final currentStreakProvider = Provider<int>(
   (ref) => StatsCalculator.currentStreak(
     ref.watch(sessionsProvider),
     ref.watch(clockProvider),
+    ptRecords: ref.watch(ptRecordsProvider),
   ),
 );
 
@@ -250,6 +255,7 @@ final historyProvider = Provider<List<DailyStats>>((ref) {
   final byDay = StatsCalculator.statsByDay(
     sessions,
     includeSkipped: trackSkipped,
+    ptRecords: ref.watch(ptRecordsProvider),
   );
   final list = byDay.values.toList()..sort((a, b) => b.date.compareTo(a.date));
   return list;
@@ -267,6 +273,19 @@ final sessionsForDayProvider = Provider.family<List<WorkoutSession>, DateTime>((
   final list = sessions
       .where((s) => AppDateUtils.isSameDay(s.startTime, day))
       .where((s) => trackSkipped || !s.skipped)
+      .toList();
+  list.sort((a, b) => b.startTime.compareTo(a.startTime));
+  return list;
+});
+
+/// MY PT sessions for a specific day, newest first.
+final ptRecordsForDayProvider = Provider.family<List<PtRecord>, DateTime>((
+  ref,
+  day,
+) {
+  final list = ref
+      .watch(ptRecordsProvider)
+      .where((r) => AppDateUtils.isSameDay(r.startTime, day))
       .toList();
   list.sort((a, b) => b.startTime.compareTo(a.startTime));
   return list;

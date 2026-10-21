@@ -18,8 +18,10 @@ import '../../widgets/primary_button.dart';
 import '../../widgets/progress_ring.dart';
 import '../../widgets/section_header.dart';
 import '../notifications/reminder_controller.dart';
+import '../pt/models/workout_plan.dart';
+import '../pt/pt_providers.dart';
 import '../workout/exercise_icons.dart';
-import '../workout/widgets/exercise_demo.dart';
+import '../pt/mannequin/mannequin_3d.dart';
 
 /// Dashboard: level and XP, today's goal ring, exercise picker, the START
 /// call-to-action, reminder status and today's sessions.
@@ -67,6 +69,45 @@ class HomeScreen extends ConsumerWidget {
                     _LevelCard(level: level, streak: streak),
                     const SizedBox(height: 14),
                     _MyPtCard(onTap: () => context.push(Routes.pt)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ActionTile(
+                            icon: Icons.bolt_rounded,
+                            title: 'Quick workout',
+                            subtitle: '10 min, no setup',
+                            color: AppColors.lime,
+                            onTap: () {
+                              final profile = ref.read(gymProfileProvider);
+                              ref
+                                  .read(ptPlanProvider.notifier)
+                                  .generate(
+                                    PtRequest(
+                                      duration: const Duration(minutes: 10),
+                                      mode: WorkoutMode.fullBody,
+                                      level: ref.read(ptRequestProvider).level,
+                                      equipment: profile.available,
+                                      seed: DateTime.now().millisecond,
+                                      quick: true,
+                                    ),
+                                  );
+                              context.push(Routes.ptSession);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _ActionTile(
+                            icon: Icons.emoji_events_rounded,
+                            title: 'Challenge',
+                            subtitle: 'Friends, one cup',
+                            color: AppColors.warning,
+                            onTap: () => context.push(Routes.challenge),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     _GoalCard(
                       exercise: goalExercise,
@@ -215,6 +256,67 @@ class _MyPtCard extends StatelessWidget {
             ),
           ),
           const Icon(Icons.chevron_right, color: AppColors.primary),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact entry tile for one-tap flows.
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -549,11 +651,14 @@ class _ExercisePicker extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Center(
-                        child: ExerciseDemo(
-                          exercise: type,
-                          size: 78,
-                          showFloor: false,
+                        child: Mannequin3D(
+                          clipId: type.clipId,
+                          size: 84,
                           playing: isSelected,
+                          interactive: false,
+                          autoRotate: false,
+                          showFloor: false,
+                          compact: true,
                         ),
                       ),
                     ),
@@ -663,8 +768,11 @@ class SessionTile extends StatelessWidget {
                   ),
                   Text(
                     '$time · $status'
+                    '${session.verified ? '' : ' · unverified'}'
                     '${session.totalMistakes > 0 ? ' · ${session.totalMistakes} coach note${session.totalMistakes == 1 ? '' : 's'}' : ''}',
-                    style: theme.textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: session.verified ? null : AppColors.warning,
+                    ),
                   ),
                 ],
               ),

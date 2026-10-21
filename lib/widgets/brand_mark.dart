@@ -30,29 +30,39 @@ class _MarkPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.shortestSide;
-    final thick = s * 0.14;
-    final path = Path();
-    for (final (cx, cy) in [(0.50, 0.36), (0.50, 0.64)]) {
-      const w = 0.56;
-      const h = 0.26;
-      path.moveTo((cx - w / 2) * s, (cy + h / 2) * s);
-      path.lineTo(cx * s, (cy - h / 2) * s);
-      path.lineTo((cx + w / 2) * s, (cy + h / 2) * s);
-    }
+    final dx = (size.width - s) / 2;
+    final dy = (size.height - s) / 2;
+    Offset p(double x, double y) => Offset(dx + x * s, dy + (1 - y) * s);
+    // Same geometry as the app icon: head, torso, V arms, driving legs.
+    final body = Path()
+      ..moveTo(p(0.5, 0.66).dx, p(0.5, 0.66).dy)
+      ..lineTo(p(0.5, 0.37).dx, p(0.5, 0.37).dy)
+      ..moveTo(p(0.22, 0.93).dx, p(0.22, 0.93).dy)
+      ..lineTo(p(0.5, 0.60).dx, p(0.5, 0.60).dy)
+      ..lineTo(p(0.78, 0.93).dx, p(0.78, 0.93).dy)
+      ..moveTo(p(0.27, 0.07).dx, p(0.27, 0.07).dy)
+      ..lineTo(p(0.5, 0.37).dx, p(0.5, 0.37).dy)
+      ..lineTo(p(0.73, 0.07).dx, p(0.73, 0.07).dy);
+    final head = Rect.fromCircle(center: p(0.5, 0.83), radius: 0.10 * s);
+    final shader = AppColors.brandGradient.createShader(Offset.zero & size);
     final stroke = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = thick
+      ..strokeWidth = s * 0.135
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
-      ..shader = AppColors.brandGradient.createShader(Offset.zero & size);
+      ..shader = shader;
+    final fill = Paint()..shader = shader;
     if (glow) {
-      canvas.drawPath(
-        path,
+      final glowStroke = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = s * 0.135
+        ..strokeCap = StrokeCap.round
+        ..color = AppColors.primary.withValues(alpha: 0.45)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, math.max(2, s * 0.08));
+      canvas.drawPath(body, glowStroke);
+      canvas.drawOval(
+        head,
         Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = thick
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
           ..color = AppColors.primary.withValues(alpha: 0.45)
           ..maskFilter = MaskFilter.blur(
             BlurStyle.normal,
@@ -60,7 +70,8 @@ class _MarkPainter extends CustomPainter {
           ),
       );
     }
-    canvas.drawPath(path, stroke);
+    canvas.drawPath(body, stroke);
+    canvas.drawOval(head, fill);
   }
 
   @override

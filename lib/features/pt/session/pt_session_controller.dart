@@ -19,7 +19,7 @@ import '../../../services/pose_detection_service.dart';
 import '../../../services/voice_coach.dart';
 import '../../workout/analysis/coaching_tracker.dart';
 import '../../workout/analysis/exercise_analyzer.dart';
-import '../analysis/generic_analyzers.dart';
+import '../../workout/analysis/generic_analyzers.dart';
 import '../models/movement.dart';
 import '../models/pt_record.dart';
 import '../models/workout_plan.dart';
@@ -62,7 +62,9 @@ class PtSessionState {
     this.error,
     this.coachLine = '',
     this.record,
+    this.saveFailed = false,
     this.lensDirection = CameraLensDirection.front,
+    this.autoStartIn = 0,
   });
 
   final WorkoutPlan plan;
@@ -97,7 +99,14 @@ class PtSessionState {
   /// The trainer's current line.
   final String coachLine;
   final PtRecord? record;
+
+  /// The record could not be written, so it earns nothing.
+  final bool saveFailed;
   final CameraLensDirection lensDirection;
+
+  /// Quick workouts: seconds until the intro starts the item by itself
+  /// (0 = no auto-start).
+  final int autoStartIn;
 
   List<PlanItem> get items => plan.all;
   PlanItem get item => items[index];
@@ -139,7 +148,9 @@ class PtSessionState {
     bool clearError = false,
     String? coachLine,
     PtRecord? record,
+    bool? saveFailed,
     CameraLensDirection? lensDirection,
+    int? autoStartIn,
   }) => PtSessionState(
     plan: plan ?? this.plan,
     index: index ?? this.index,
@@ -168,7 +179,9 @@ class PtSessionState {
     error: clearError ? null : (error ?? this.error),
     coachLine: coachLine ?? this.coachLine,
     record: record ?? this.record,
+    saveFailed: saveFailed ?? this.saveFailed,
     lensDirection: lensDirection ?? this.lensDirection,
+    autoStartIn: autoStartIn ?? this.autoStartIn,
   );
 }
 
@@ -214,6 +227,7 @@ class PtSessionController extends Notifier<PtSessionState> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
     return PtSessionState(
       plan: plan,
+      autoStartIn: plan.request.quick ? _autoStartSeconds : 0,
       coachLine: CoachVoice.beforeItem(plan.all.first, first: true),
       lensDirection: settings.cameraFacing == CameraFacing.back
           ? CameraLensDirection.back
@@ -241,13 +255,44 @@ class PtSessionController extends Notifier<PtSessionState> {
   // Clock
   // ---------------------------------------------------------------------------
 
+  static const _autoStartSeconds = 8;
+
   void _tick() {
     if (_disposed || state.paused || state.step == PtStep.finished) return;
-    final base = _elapsedBase;
-    if (base == null) return;
+    if (state.step == PtStep.intro && state.autoStartIn > 0) {
+      final left = state.autoStartIn - 1;
+      state = state.copyWith(autoStartIn: left);
+      if (left == 0) {
+        unawaited(beginItem());
+        return;
+      }
+    }
+    if (_elapsedBase == null) return;
+    state = state.copyWith(elapsed: _activeElapsed);
+  }
+
+  /// Skips the one identity check. The session is coached but not scored.
+  void skipVerification() {
+    if (state.verificationDone) return;
+    _verifyTimer?.cancel();
     state = state.copyWith(
-      elapsed: _elapsedBefore + DateTime.now().difference(base),
+      verificationDone: true,
+      verified: false,
+      camera: state.camera == PtCameraPhase.verifying
+          ? PtCameraPhase.tracking
+          : state.camera,
+      faceMessage:
+          'Face check skipped: this session is coached but not scored '
+          '(no streak, no XP).',
     );
+    _onVerificationSettled();
+  }
+
+  /// Session time excluding pauses.
+  Duration get _activeElapsed {
+    final base = _elapsedBase;
+    if (state.paused || base == null) return _elapsedBefore;
+    return _elapsedBefore + DateTime.now().difference(base);
   }
 
   // ---------------------------------------------------------------------------
@@ -267,8 +312,14 @@ class PtSessionController extends Notifier<PtSessionState> {
       itemSeconds: 0,
       itemMistakes: const {},
       clearCoachCue: true,
+      autoStartIn: 0,
     );
     await _startSet();
+  }
+
+  /// Stops the quick-workout auto-start (the user wants to read first).
+  void holdIntro() {
+    if (state.autoStartIn > 0) state = state.copyWith(autoStartIn: 0);
   }
 
   Future<void> _startSet() async {
@@ -276,7 +327,10 @@ class PtSessionController extends Notifier<PtSessionState> {
     final spec = item.movement.tracking;
     _setTimer?.cancel();
     if (spec is TimerTracking) {
-      await _releaseCamera();
+      _analyzer = null;
+      if (state.camera != PtCameraPhase.error) {
+        await _ensureCamera();
+      }
       if (item.isTimed) {
         _setTimer = Timer.periodic(const Duration(seconds: 1), (_) {
           if (state.paused || state.step != PtStep.active) return;
@@ -296,18 +350,30 @@ class PtSessionController extends Notifier<PtSessionState> {
       target: state.target,
     );
     _coach.reset();
+    await _ensureCamera();
+  }
+
+  /// Opens the camera (or restarts its stream) and runs the one identity
+  /// check if it has not happened yet.
+  Future<void> _ensureCamera() async {
     if (_camera == null || !(_camera?.isInitialized ?? false)) {
       await _openCamera();
-    } else if (!(_camera?.isStreaming ?? false)) {
+      return;
+    }
+    if (!(_camera?.isStreaming ?? false)) {
       try {
         await _camera!.startStream(onPose: _onPose, onError: _onCameraError);
       } on PoseDetectionException catch (e) {
         _cameraFailed(e);
+        return;
       }
     }
     if (state.camera == PtCameraPhase.off ||
-        state.camera == PtCameraPhase.starting) {
+        state.camera == PtCameraPhase.starting ||
+        state.camera == PtCameraPhase.error) {
       state = state.copyWith(
+        cameraReady: true,
+        clearError: true,
         camera: state.verificationDone
             ? PtCameraPhase.tracking
             : PtCameraPhase.verifying,
@@ -323,13 +389,7 @@ class PtSessionController extends Notifier<PtSessionState> {
       mistakes[e.key] = (mistakes[e.key] ?? 0) + e.value;
     }
     final reps = state.itemReps + (item.isTimed ? 0 : state.repsInSet);
-    final seconds =
-        state.itemSeconds +
-        (item.isTimed
-            ? (item.movement.tracking is TimerTracking
-                  ? state.secondsInSet
-                  : state.repsInSet)
-            : 0);
+    final seconds = state.itemSeconds + (item.isTimed ? _setSeconds(item) : 0);
     _setTimer?.cancel();
     final line = CoachVoice.afterSet(
       item: item,
@@ -372,6 +432,12 @@ class PtSessionController extends Notifier<PtSessionState> {
     }
   }
 
+  /// Seconds of work in the current set. Camera holds count whole seconds
+  /// as reps; timer items use the set timer.
+  int _setSeconds(PlanItem item) => item.movement.tracking is TimerTracking
+      ? state.secondsInSet
+      : state.repsInSet;
+
   /// Ends the rest early.
   void skipRest() {
     if (state.step != PtStep.rest) return;
@@ -381,7 +447,6 @@ class PtSessionController extends Notifier<PtSessionState> {
   Future<void> _nextSet() async {
     _restTimer?.cancel();
     final next = state.setIndex + 1;
-    _analyzer?.resetCounting();
     _coach.reset();
     state = state.copyWith(
       step: PtStep.active,
@@ -434,7 +499,12 @@ class PtSessionController extends Notifier<PtSessionState> {
       movementId: item.movement.id,
       phase: item.phase,
       setsPlanned: item.sets,
-      setsDone: skipped ? state.setIndex : item.sets,
+      // During rest the set just finished is already done.
+      setsDone: !skipped
+          ? item.sets
+          : state.step == PtStep.rest
+          ? state.setIndex + 1
+          : state.setIndex,
       reps: state.itemReps,
       seconds: state.itemSeconds,
       skipped: skipped,
@@ -462,13 +532,10 @@ class PtSessionController extends Notifier<PtSessionState> {
       coachLine: line,
       clearCoachCue: true,
       clearPose: true,
+      autoStartIn: state.plan.request.quick ? _autoStartSeconds : 0,
     );
     _say(line);
-    if (!next.movement.tracking.usesCamera) {
-      unawaited(_releaseCamera());
-    } else {
-      unawaited(_camera?.stopStream());
-    }
+    if (state.verificationDone) unawaited(_camera?.stopStream());
   }
 
   Future<void> pause() async {
@@ -484,15 +551,11 @@ class PtSessionController extends Notifier<PtSessionState> {
     if (!state.paused) return;
     _elapsedBase = DateTime.now();
     state = state.copyWith(paused: false, coachLine: 'Back in. Keep going.');
-    if (state.step == PtStep.active && state.usesCamera) {
+    if (state.step == PtStep.active && state.camera != PtCameraPhase.error) {
       if (_cameraReleasedByLifecycle || !(_camera?.isInitialized ?? false)) {
         await _openCamera();
       } else {
-        try {
-          await _camera!.startStream(onPose: _onPose, onError: _onCameraError);
-        } on PoseDetectionException catch (e) {
-          _cameraFailed(e);
-        }
+        await _ensureCamera();
       }
     }
   }
@@ -506,23 +569,31 @@ class PtSessionController extends Notifier<PtSessionState> {
     final results = [...state.results];
     final item = state.items.isEmpty ? null : state.item;
     if (item != null && state.step != PtStep.intro) {
-      // Partial current item.
-      final partialReps = state.itemReps + (item.isTimed ? 0 : state.repsInSet);
-      final partialSeconds =
-          state.itemSeconds + (item.isTimed ? state.secondsInSet : 0);
+      // Partial current item. During rest the last set is already in the
+      // item totals; mid-set, add what this set has so far.
+      final inSet = state.step == PtStep.active;
+      final mistakes = Map<FormStatus, int>.from(state.itemMistakes);
+      if (inSet) {
+        for (final e in _coach.mistakes.entries) {
+          mistakes[e.key] = (mistakes[e.key] ?? 0) + e.value;
+        }
+      }
       results.add(
         PtItemResult(
           movementId: item.movement.id,
           phase: item.phase,
           setsPlanned: item.sets,
-          setsDone: state.setIndex,
-          reps: partialReps,
-          seconds: partialSeconds,
+          setsDone: inSet ? state.setIndex : state.setIndex + 1,
+          reps: state.itemReps + (inSet && !item.isTimed ? state.repsInSet : 0),
+          seconds:
+              state.itemSeconds +
+              (inSet && item.isTimed ? _setSeconds(item) : 0),
           skipped: false,
-          mistakes: state.itemMistakes,
+          mistakes: mistakes,
         ),
       );
     }
+    final activeSeconds = _activeElapsed.inSeconds;
     await _releaseCamera();
     unawaited(_setWakelock(false));
     final now = DateTime.now();
@@ -534,18 +605,26 @@ class PtSessionController extends Notifier<PtSessionState> {
       plannedMinutes: state.plan.request.duration.inMinutes,
       items: results,
       verified: state.verified,
+      plannedItems: state.items.length,
+      activeSeconds: activeSeconds,
     );
+    var saveFailed = false;
     try {
       await ref.read(ptRecordsProvider.notifier).add(record);
     } catch (e) {
       debugPrint('Saving PT record failed: $e');
+      saveFailed = true;
     }
-    final line = CoachVoice.summary(record);
+    final line = saveFailed
+        ? '${CoachVoice.summary(record)} I could not save this session, so it '
+              'will not count toward your level.'
+        : CoachVoice.summary(record);
     if (_disposed) return;
     state = state.copyWith(
       step: PtStep.finished,
       results: results,
       record: record,
+      saveFailed: saveFailed,
       coachLine: line,
       clearPose: true,
       clearCoachCue: true,
@@ -681,8 +760,13 @@ class PtSessionController extends Notifier<PtSessionState> {
             "Couldn't confirm it's you. I'll still coach you, but this "
             'session will not be scored.',
       );
+      _onVerificationSettled();
     });
   }
+
+  /// The camera stays on after the identity check: every item shows the
+  /// live view next to the guide.
+  void _onVerificationSettled() {}
 
   Future<void> _onFrame(CameraFrame frame) async {
     if (_disposed || state.verificationDone) return;
@@ -705,6 +789,7 @@ class PtSessionController extends Notifier<PtSessionState> {
             faceMessage: 'Verified. Let\'s go.',
           );
           _sayCue(VoiceCue.verified, label: 'Let\'s go');
+          _onVerificationSettled();
           Timer(const Duration(seconds: 3), () {
             if (!_disposed) state = state.copyWith(clearFaceMessage: true);
           });
@@ -717,9 +802,24 @@ class PtSessionController extends Notifier<PtSessionState> {
   }
 
   void _onPose(PoseResult pose) {
+    if (_disposed) return;
     final analyzer = _analyzer;
-    if (_disposed || analyzer == null) return;
     final mirror = _camera?.mirrorPreview ?? state.mirror;
+    if (analyzer == null) {
+      // Timer item: show the skeleton and whether the body is in frame.
+      final visible =
+          pose.hasPose &&
+          (pose.confidenceOf(LandmarkType.leftShoulder) > 0.3 ||
+              pose.confidenceOf(LandmarkType.rightShoulder) > 0.3) &&
+          (pose.confidenceOf(LandmarkType.leftHip) > 0.3 ||
+              pose.confidenceOf(LandmarkType.rightHip) > 0.3);
+      state = state.copyWith(
+        pose: pose,
+        mirror: mirror,
+        formStatus: visible ? FormStatus.goodForm : FormStatus.bodyNotVisible,
+      );
+      return;
+    }
     if (state.step != PtStep.active ||
         state.paused ||
         state.camera != PtCameraPhase.tracking) {
@@ -746,7 +846,7 @@ class PtSessionController extends Notifier<PtSessionState> {
         _ => null,
       };
       final spoken = exercise == null
-          ? (fired.isEvent ? fired.message : fired.message)
+          ? fired.message
           : CoachingLibrary.cue(fired, exercise)?.spoken;
       _sayCue(VoiceCue.coach, label: spoken);
     }

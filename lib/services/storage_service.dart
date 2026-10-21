@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/exercise.dart';
 import '../models/face_template.dart';
 import '../models/user_settings.dart';
+import '../features/challenge/data/challenge_repository.dart';
 import '../features/pt/data/pt_repository.dart';
 import '../models/workout_session.dart';
 
@@ -311,16 +312,19 @@ class StorageService {
     required this.settings,
     required this.sessions,
     required this.pt,
+    required this.challenges,
   });
 
   final SettingsRepository settings;
   final SessionRepository sessions;
   final PtRepository pt;
+  final ChallengeRepository challenges;
 
   static Future<StorageService> initialize() async {
     SettingsRepository settingsRepo;
     SessionRepository sessionRepo;
     PtRepository ptRepo;
+    ChallengeRepository challengeRepo;
     try {
       settingsRepo = await PrefsSettingsRepository.load();
     } catch (e) {
@@ -339,10 +343,17 @@ class StorageService {
       debugPrint('Hive unavailable, using in-memory PT storage: $e');
       ptRepo = InMemoryPtRepository();
     }
+    try {
+      challengeRepo = await HiveChallengeRepository.open();
+    } catch (e) {
+      debugPrint('Hive unavailable, using in-memory challenges: $e');
+      challengeRepo = InMemoryChallengeRepository();
+    }
     return StorageService(
       settings: settingsRepo,
       sessions: sessionRepo,
       pt: ptRepo,
+      challenges: challengeRepo,
     );
   }
 }

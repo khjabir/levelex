@@ -31,19 +31,23 @@ class WorkoutPlanner {
       targets: targets,
       maxItems: 5,
     );
-    final main = request.mode == WorkoutMode.hiit
+    List<PlanItem> stretches() => _fillTimed(
+      request,
+      rng,
+      phase: PlanPhase.coolDown,
+      budget: mainBudget,
+      targets: targets,
+      maxItems: 8,
+      seconds: 45,
+    );
+    var main = request.mode == WorkoutMode.hiit
         ? _hiit(request, rng, mainBudget)
         : request.mode == WorkoutMode.mobility
-        ? _fillTimed(
-            request,
-            rng,
-            phase: PlanPhase.coolDown,
-            budget: mainBudget,
-            targets: targets,
-            maxItems: 8,
-            seconds: 45,
-          )
+        ? stretches()
         : _mainWork(request, rng, mainBudget, targets);
+    // A custom focus such as mobility alone has no main-phase movements, so
+    // the session becomes a stretch block rather than an empty one.
+    if (main.isEmpty) main = stretches();
     final worked = {
       for (final i in main) ...i.movement.primary,
       for (final i in main) ...i.movement.secondary,
@@ -101,16 +105,16 @@ class WorkoutPlanner {
     required int maxItems,
     int? seconds,
   }) {
-    final pool =
-        library
-            .where((m) => m.phases.contains(phase))
-            .where((m) => m.canDoWith(request.equipment))
-            .toList()
-          ..sort((a, b) {
-            final sa = _affinity(a, targets) + rng.nextDouble() * 1.5;
-            final sb = _affinity(b, targets) + rng.nextDouble() * 1.5;
-            return sb.compareTo(sa);
-          });
+    final candidates = library
+        .where((m) => m.phases.contains(phase))
+        .where((m) => m.canDoWith(request.equipment));
+    // Score once per movement so the comparator is consistent.
+    final scores = {
+      for (final m in candidates)
+        m.id: _affinity(m, targets) + rng.nextDouble() * 1.5,
+    };
+    final pool = candidates.toList()
+      ..sort((a, b) => scores[b.id]!.compareTo(scores[a.id]!));
     final items = <PlanItem>[];
     var used = 0;
     for (final m in pool) {
@@ -143,6 +147,7 @@ class WorkoutPlanner {
         .where((m) => m.canDoWith(request.equipment))
         .where((m) => m.primary.intersection(targets).isNotEmpty)
         .toList();
+    if (pool.isEmpty) return const [];
     // Compound movements first, then isolation; equipment-based work is
     // favoured when the user has equipment (that is why they told us).
     double score(Movement m) {
@@ -153,7 +158,8 @@ class WorkoutPlanner {
       return s + rng.nextDouble() * 1.2;
     }
 
-    pool.sort((a, b) => score(b).compareTo(score(a)));
+    final scores = {for (final m in pool) m.id: score(m)};
+    pool.sort((a, b) => scores[b.id]!.compareTo(scores[a.id]!));
 
     final items = <PlanItem>[];
     final covered = <MuscleGroup>{};
@@ -164,7 +170,7 @@ class WorkoutPlanner {
     while (used < budget && guard++ < 40) {
       Movement? pick;
       for (final muscle in targetList) {
-        if (covered.contains(muscle) && covered.length < targets.length) {
+        if (covered.contains(muscle) && !covered.containsAll(targets)) {
           continue;
         }
         pick = pool.firstWhere(

@@ -1,3 +1,4 @@
+import '../../features/pt/models/pt_record.dart';
 import '../../models/reminder_time.dart';
 import '../../models/user_settings.dart';
 import '../../models/workout_session.dart';
@@ -74,7 +75,8 @@ class ReminderSchedule {
 
   /// Reminders whose window `[slot, slot + interval)` has fully elapsed by
   /// [now], started at or after [from], and in which the user attempted no
-  /// workout. These are the sessions the user "skipped".
+  /// workout. These are the sessions the user "skipped". A MY PT session
+  /// covers every window it overlaps.
   ///
   /// A reminder's window is closed only once a full [interval] has passed,
   /// so the user always gets the whole interval to respond. Windows that
@@ -84,6 +86,7 @@ class ReminderSchedule {
     required DateTime from,
     required DateTime now,
     required Iterable<WorkoutSession> sessions,
+    Iterable<PtRecord> ptRecords = const [],
     DateTime? evaluatedUntil,
   }) {
     if (!enabled) return const [];
@@ -91,6 +94,7 @@ class ReminderSchedule {
         .where((s) => s.isAttempted)
         .map((s) => s.startTime)
         .toList();
+    final ptAttempted = ptRecords.where((r) => r.isAttempted).toList();
 
     final skipped = <DateTime>[];
     var day = AppDateUtils.dateOnly(from);
@@ -103,9 +107,12 @@ class ReminderSchedule {
         if (evaluatedUntil != null && !windowEnd.isAfter(evaluatedUntil)) {
           continue; // Already evaluated.
         }
-        final attemptedInWindow = attempted.any(
-          (t) => !t.isBefore(slot) && t.isBefore(windowEnd),
-        );
+        final attemptedInWindow =
+            attempted.any((t) => !t.isBefore(slot) && t.isBefore(windowEnd)) ||
+            ptAttempted.any(
+              (r) =>
+                  r.startTime.isBefore(windowEnd) && !r.endTime.isBefore(slot),
+            );
         if (!attemptedInWindow) skipped.add(slot);
       }
       day = AppDateUtils.addDays(day, 1);

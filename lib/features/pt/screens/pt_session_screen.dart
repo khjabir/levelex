@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +21,7 @@ import '../../workout/widgets/camera_preview_fill.dart';
 import '../../workout/widgets/coach_card.dart';
 import '../../workout/widgets/pose_painter.dart';
 import '../mannequin/mannequin_3d.dart';
+import '../models/equipment.dart';
 import '../models/movement.dart';
 import '../models/workout_plan.dart';
 import '../planner/coach_voice.dart';
@@ -109,7 +112,8 @@ class _PtSessionScreenState extends ConsumerState<PtSessionScreen>
         if (!didPop) _confirmExit();
       },
       child: Scaffold(
-        backgroundColor: state.step == PtStep.active && state.usesCamera
+        backgroundColor:
+            state.step == PtStep.active && state.camera != PtCameraPhase.error
             ? Colors.black
             : AppColors.background,
         body: switch (state.step) {
@@ -118,11 +122,12 @@ class _PtSessionScreenState extends ConsumerState<PtSessionScreen>
             controller: controller,
             onExit: _confirmExit,
           ),
-          PtStep.active when state.usesCamera => _TrackedView(
-            state: state,
-            controller: controller,
-            onExit: _confirmExit,
-          ),
+          PtStep.active when state.camera != PtCameraPhase.error =>
+            _TrackedView(
+              state: state,
+              controller: controller,
+              onExit: _confirmExit,
+            ),
           PtStep.active => _TimedView(
             state: state,
             controller: controller,
@@ -382,6 +387,7 @@ class _IntroView extends ConsumerWidget {
                   icon: Icons.swap_horiz_rounded,
                   label: 'Swap',
                   onPressed: () {
+                    controller.holdIntro();
                     if (!controller.swapItem()) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -400,7 +406,9 @@ class _IntroView extends ConsumerWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: PrimaryButton(
-                    label: "I'M READY",
+                    label: state.autoStartIn > 0
+                        ? "I'M READY · ${state.autoStartIn}"
+                        : "I'M READY",
                     icon: Icons.play_arrow_rounded,
                     height: 56,
                     onPressed: controller.beginItem,
@@ -424,6 +432,11 @@ class _EquipmentGuide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final photos = <(Equipment, EquipmentItem)>[
+      for (final e in item.equipment)
+        if (profile.item(e) case final EquipmentItem it?)
+          if (it.photoPath != null && File(it.photoPath!).existsSync()) (e, it),
+    ];
     return AppCard(
       padding: const EdgeInsets.all(14),
       borderColor: AppColors.secondary.withValues(alpha: 0.35),
@@ -449,6 +462,60 @@ class _EquipmentGuide extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
+          for (final (type, it) in photos)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Stack(
+                  children: [
+                    Image.file(
+                      File(it.photoPath!),
+                      height: 170,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(12, 18, 12, 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.75),
+                            ],
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.place_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${type.label}'
+                                '${it.location?.isNotEmpty == true ? ' · ${it.location}' : ''}',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -535,6 +602,9 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
     final controller = widget.controller;
     final theme = Theme.of(context);
     final item = state.item;
+    final timerItem = item.movement.tracking is TimerTracking;
+    final remaining = (item.seconds - state.secondsInSet).clamp(0, 9999);
+    final profile = ref.watch(gymProfileProvider);
     final cameraController = controller.cameraService?.controller;
     final exercise = switch (item.movement.tracking) {
       ExerciseTracking(:final type) => type,
@@ -568,6 +638,7 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                 pose: state.pose,
                 mirror: state.mirror,
                 good: state.formStatus.isGood,
+                issue: state.coachCue,
               ),
             ),
           )
@@ -620,13 +691,22 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                               scale: state.repJustCounted ? 1.15 : 1,
                               duration: AppTokens.fast,
                               child: Text(
-                                '${state.repsInSet}',
+                                timerItem
+                                    ? (item.isTimed
+                                          ? formatClock(
+                                              Duration(seconds: remaining),
+                                            )
+                                          : '${item.reps}')
+                                    : '${state.repsInSet}',
                                 style: theme.textTheme.displayMedium?.copyWith(
                                   color: state.repJustCounted
                                       ? AppColors.primary
                                       : Colors.white,
                                   fontSize: 58,
                                   height: 1,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
                                 ),
                               ),
                             ),
@@ -636,7 +716,11 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                                 left: 6,
                               ),
                               child: Text(
-                                '/ ${state.target}${item.isTimed ? ' s' : ''}',
+                                timerItem
+                                    ? (item.isTimed
+                                          ? 'left'
+                                          : 'reps, your pace')
+                                    : '/ ${state.target}${item.isTimed ? ' s' : ''}',
                                 style: theme.textTheme.headlineSmall?.copyWith(
                                   color: Colors.white54,
                                 ),
@@ -651,6 +735,17 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                             letterSpacing: 1.4,
                           ),
                         ),
+                        if (item.equipment.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Wrap(
+                              spacing: 6,
+                              children: [
+                                for (final e in item.equipment)
+                                  EquipmentChip(type: e, item: profile.item(e)),
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -682,6 +777,12 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                         : state.verificationDone
                         ? AppColors.warning
                         : AppColors.cyan,
+                    action: state.verificationDone
+                        ? null
+                        : TextButton(
+                            onPressed: controller.skipVerification,
+                            child: const Text('Skip'),
+                          ),
                   ),
                 ),
               if (state.camera == PtCameraPhase.error)
@@ -702,6 +803,9 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                   positionHint:
                       exercise?.positionHint ??
                       'Get into the start position shown by the guide',
+                  goodLabel: timerItem
+                      ? 'I can see you. Follow the guide.'
+                      : 'Good form',
                 ),
               ),
               const SizedBox(height: 12),
@@ -735,7 +839,9 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                       child: SizedBox(
                         height: 56,
                         child: FilledButton.icon(
-                          onPressed: state.camera == PtCameraPhase.error
+                          onPressed: timerItem && !item.isTimed
+                              ? () => _logManually(context)
+                              : state.camera == PtCameraPhase.error
                               ? () => _logManually(context)
                               : controller.finishSetEarly,
                           style: FilledButton.styleFrom(
@@ -744,7 +850,9 @@ class _TrackedViewState extends ConsumerState<_TrackedView> {
                           ),
                           icon: const Icon(Icons.check_rounded),
                           label: Text(
-                            state.camera == PtCameraPhase.error
+                            timerItem
+                                ? (item.isTimed ? 'DONE EARLY' : 'LOG REPS')
+                                : state.camera == PtCameraPhase.error
                                 ? 'LOG SET'
                                 : 'SET DONE',
                           ),
@@ -835,11 +943,13 @@ class _CameraBanner extends StatelessWidget {
     required this.icon,
     required this.text,
     required this.color,
+    this.action,
   });
 
   final IconData icon;
   final String text;
   final Color color;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -861,6 +971,7 @@ class _CameraBanner extends StatelessWidget {
                   ?.copyWith(color: Colors.white),
             ),
           ),
+          ?action,
         ],
       ),
     );
@@ -940,6 +1051,22 @@ class _TimedView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: TrainerBubble(text: state.coachLine, compact: true),
           ),
+          if (state.camera == PtCameraPhase.verifying ||
+              state.faceMessage != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: _CameraBanner(
+                icon: state.verified
+                    ? Icons.verified_rounded
+                    : Icons.face_retouching_natural,
+                text: state.faceMessage ?? 'Checking it\'s you…',
+                color: state.verified
+                    ? AppColors.primary
+                    : state.verificationDone
+                    ? AppColors.warning
+                    : AppColors.cyan,
+              ),
+            ),
           Expanded(
             child: Stack(
               children: [
@@ -1157,9 +1284,11 @@ class _SummaryView extends ConsumerWidget {
     final theme = Theme.of(context);
     final record = state.record;
     final level = ref.watch(levelProvider);
-    final xp = record == null ? 0 : LevelSystem.xpForPtRecord(record);
+    final xp = record == null || state.saveFailed
+        ? 0
+        : LevelSystem.xpForPtRecord(record);
     final done = record?.itemsDone ?? 0;
-    final total = record?.items.length ?? 0;
+    final total = record?.itemCount ?? 0;
     final complete = record != null && record.completion >= 0.8;
     return Stack(
       children: [

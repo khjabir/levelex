@@ -13,6 +13,7 @@ class CoachCard extends StatelessWidget {
     required this.cue,
     required this.status,
     required this.positionHint,
+    this.goodLabel = 'Good form',
   });
 
   /// Active correction (null when nothing needs fixing).
@@ -21,6 +22,9 @@ class CoachCard extends StatelessWidget {
   /// Current posture/visibility status, used when there is no cue.
   final FormStatus status;
   final String positionHint;
+
+  /// Text of the quiet pill when nothing needs fixing.
+  final String goodLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +105,7 @@ class CoachCard extends StatelessWidget {
     }
 
     final (icon, color, text) = status.isGood
-        ? (Icons.check_circle_rounded, AppColors.primary, 'Good form')
+        ? (Icons.check_circle_rounded, AppColors.primary, goodLabel)
         : status.isTracking
         ? (Icons.info_outline_rounded, AppColors.warning, status.message)
         : status == FormStatus.notInPosition

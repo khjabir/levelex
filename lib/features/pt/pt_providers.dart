@@ -56,7 +56,10 @@ final ptRecordsProvider = NotifierProvider<PtRecordsNotifier, List<PtRecord>>(
 class PtRequestNotifier extends Notifier<PtRequest> {
   @override
   PtRequest build() {
-    final equipment = ref.watch(gymProfileProvider.select((p) => p.available));
+    // Read, not watch: watching would rebuild the request and wipe the
+    // user's choices whenever they toggle equipment. BUILD passes the
+    // current equipment in anyway.
+    final equipment = ref.read(gymProfileProvider).available;
     final records = ref.read(ptRecordsProvider);
     final last = records.isEmpty ? null : records.last;
     return PtRequest(

@@ -10,6 +10,7 @@ import '../../models/daily_stats.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/section_header.dart';
 import '../home/home_screen.dart';
+import '../pt/screens/pt_home_screen.dart';
 
 /// Per-day history with a 7-day chart and tappable day details.
 class HistoryScreen extends ConsumerWidget {
@@ -244,9 +245,10 @@ class _DayTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final total = stats.attemptedSessions + stats.ptSessions;
     final subtitle = [
-      '${stats.attemptedSessions} '
-          '${stats.attemptedSessions == 1 ? 'session' : 'sessions'}',
+      '$total ${total == 1 ? 'session' : 'sessions'}',
+      if (stats.ptSessions > 0) '${stats.ptSessions} MY PT',
       if (stats.skippedSessions > 0) '${stats.skippedSessions} skipped',
     ].join(' · ');
     return ListTile(
@@ -288,6 +290,7 @@ class _DayDetailSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final sessions = ref.watch(sessionsForDayProvider(stats.date));
+    final ptRecords = ref.watch(ptRecordsForDayProvider(stats.date));
     final today = ref.watch(clockProvider);
     return DraggableScrollableSheet(
       expand: false,
@@ -319,11 +322,11 @@ class _DayDetailSheet extends ConsumerWidget {
               ),
               _DetailStat(
                 label: 'Sessions',
-                value: '${stats.attemptedSessions}',
+                value: '${stats.attemptedSessions + stats.ptSessions}',
               ),
               _DetailStat(
                 label: 'Completed',
-                value: '${stats.completedSessions}',
+                value: '${stats.completedSessions + stats.ptCompletedSessions}',
               ),
               _DetailStat(
                 label: 'Skipped',
@@ -332,20 +335,38 @@ class _DayDetailSheet extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          const SectionHeader('Sessions'),
-          AppCard(
-            color: AppColors.card,
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              children: [
-                for (var i = 0; i < sessions.length; i++) ...[
-                  if (i > 0) const Divider(indent: 20, endIndent: 20),
-                  SessionTile(session: sessions[i]),
+          if (ptRecords.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const SectionHeader('MY PT'),
+            AppCard(
+              color: AppColors.card,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (var i = 0; i < ptRecords.length; i++) ...[
+                    if (i > 0) const Divider(indent: 20, endIndent: 20),
+                    PtRecordTile(record: ptRecords[i]),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
+          if (sessions.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const SectionHeader('Sessions'),
+            AppCard(
+              color: AppColors.card,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Column(
+                children: [
+                  for (var i = 0; i < sessions.length; i++) ...[
+                    if (i > 0) const Divider(indent: 20, endIndent: 20),
+                    SessionTile(session: sessions[i]),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

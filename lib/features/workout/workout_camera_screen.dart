@@ -82,6 +82,7 @@ class _WorkoutCameraScreenState extends ConsumerState<WorkoutCameraScreen>
           session: state.result,
           report: state.report ?? '',
           mistakes: state.mistakes,
+          verified: state.verified,
         ),
       );
     }
@@ -210,6 +211,7 @@ class _CameraLayer extends ConsumerWidget {
           pose: state.pose,
           mirror: state.mirror,
           good: state.formStatus.isGood,
+          issue: state.coachCue,
         ),
       ),
     );
@@ -327,6 +329,31 @@ class _TopHud extends StatelessWidget {
                       letterSpacing: 2,
                     ),
                   ),
+                  if (!state.verified)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        child: Text(
+                          'UNVERIFIED · NO STREAK / XP',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppColors.warning,
+                            letterSpacing: 1,
+                            fontSize: 9,
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -439,6 +466,15 @@ class _CenterOverlay extends ConsumerWidget {
                 width: 28,
                 height: 28,
                 child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: () => confirmBypassVerification(
+                  context,
+                  controller,
+                  restart: false,
+                ),
+                child: const Text('Skip verification'),
               ),
             ],
           ),
@@ -626,12 +662,53 @@ class _FaceErrorPanel extends StatelessWidget {
               style: FilledButton.styleFrom(minimumSize: const Size(220, 52)),
             ),
           TextButton(
+            onPressed: () =>
+                confirmBypassVerification(context, controller, restart: true),
+            child: const Text('Continue without verification'),
+          ),
+          TextButton(
             onPressed: () => context.go(Routes.home),
             child: const Text('Back to home'),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Explains what skipping the face check means, then either restarts the
+/// set without a check or skips the one in progress.
+Future<void> confirmBypassVerification(
+  BuildContext context,
+  WorkoutController controller, {
+  required bool restart,
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Skip the face check?'),
+      content: const Text(
+        'Your reps will still be counted, coached and saved. Because nobody '
+        'confirmed it was you, this set will be marked unverified: it will '
+        'not count towards your streak and earns no XP.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Skip and continue'),
+        ),
+      ],
+    ),
+  );
+  if (ok != true) return;
+  if (restart) {
+    await controller.start(bypassIdentity: true);
+  } else {
+    controller.skipVerification();
   }
 }
 

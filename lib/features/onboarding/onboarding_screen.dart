@@ -4,23 +4,27 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/routes.dart';
 import '../../app/theme.dart';
-import '../../models/exercise.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/brand_mark.dart';
 import '../../widgets/primary_button.dart';
-import '../workout/widgets/exercise_demo.dart';
+import '../pt/mannequin/mannequin_3d.dart';
 
 class _Page {
   const _Page({
-    required this.exercise,
-    required this.variant,
+    required this.clipId,
+    this.highlight = const {},
+    this.caption,
     required this.eyebrow,
     required this.title,
     required this.body,
   });
 
-  final ExerciseType exercise;
-  final DemoVariant variant;
+  /// Mannequin clip shown on the page.
+  final String clipId;
+
+  /// Body parts flagged in the warning colour (mistake demo).
+  final Set<String> highlight;
+  final String? caption;
   final String eyebrow;
   final String title;
   final String body;
@@ -28,8 +32,7 @@ class _Page {
 
 const _pages = [
   _Page(
-    exercise: ExerciseType.pushUp,
-    variant: DemoVariant.correct,
+    clipId: 'push_up',
     eyebrow: 'ON-DEVICE TRACKING',
     title: 'Your camera counts\nevery rep',
     body:
@@ -37,22 +40,22 @@ const _pages = [
         'nothing is uploaded and every rep is counted from any angle.',
   ),
   _Page(
-    exercise: ExerciseType.squat,
-    variant: DemoVariant.mistake,
+    clipId: 'squat',
+    highlight: {'torso'},
+    caption: 'Chest falling forward: the coach would say "chest up".',
     eyebrow: 'LIVE COACHING',
     title: 'Fix mistakes\nas they happen',
     body:
-        'Animated guides show the right way. During a set the coach calls '
-        'out what to change: go deeper, chest up, hips in line.',
+        '3D guides show the right way from any angle. During a set the coach '
+        'calls out what to change: go deeper, chest up, hips in line.',
   ),
   _Page(
-    exercise: ExerciseType.jumpingJack,
-    variant: DemoVariant.correct,
+    clipId: 'jumping_jack',
     eyebrow: 'LEVEL UP',
     title: 'Earn XP.\nClimb the ranks',
     body:
-        'Seven exercises, hourly reminders and a streak to protect. Every rep '
-        'earns XP on your way from Rookie to Legend.',
+        'Thirteen exercises, MY PT guided sessions, challenges with friends '
+        'and a streak to protect. Every rep earns XP from Rookie to Legend.',
   ),
 ];
 
@@ -180,13 +183,16 @@ class _OnboardingPage extends StatelessWidget {
                     padding: const EdgeInsets.all(18),
                     child: Column(
                       children: [
-                        ExerciseDemo(
-                          exercise: page.exercise,
-                          variant: page.variant,
-                          size: 200,
-                          playing: active,
+                        SizedBox(
+                          height: 210,
+                          child: Mannequin3D(
+                            clipId: page.clipId,
+                            playing: active,
+                            highlight: page.highlight,
+                            interactive: false,
+                          ),
                         ),
-                        if (page.variant == DemoVariant.mistake)
+                        if (page.caption != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Row(
@@ -203,8 +209,7 @@ class _OnboardingPage extends StatelessWidget {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    'Chest falling forward: the coach would '
-                                    'say "chest up".',
+                                    page.caption!,
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       color: AppColors.warning,
                                     ),

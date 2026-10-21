@@ -119,6 +119,29 @@ void main() {
       }
     });
 
+    test('a mobility-only custom focus builds a stretch block', () {
+      final plan = planner.build(
+        const PtRequest(
+          mode: WorkoutMode.custom,
+          focus: {MuscleGroup.mobility},
+          duration: Duration(minutes: 20),
+        ),
+      );
+      expect(plan.main, isNotEmpty);
+    });
+
+    test('custom focus covers every chosen muscle', () {
+      const focus = {MuscleGroup.chest, MuscleGroup.back, MuscleGroup.quads};
+      final plan = planner.build(
+        const PtRequest(
+          mode: WorkoutMode.custom,
+          focus: focus,
+          duration: Duration(minutes: 45),
+        ),
+      );
+      expect(plan.musclesCovered.containsAll(focus), isTrue);
+    });
+
     test('HIIT builds timed rounds', () {
       final plan = planner.build(
         const PtRequest(

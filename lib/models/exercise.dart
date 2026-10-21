@@ -115,6 +115,102 @@ enum ExerciseType {
       'Push back up to standing. Each descent is one rep.',
       'Keep your torso upright.',
     ],
+  ),
+  gluteBridge(
+    id: 'glute_bridge',
+    label: 'Glute bridges',
+    singular: 'glute bridge',
+    unit: ExerciseUnit.reps,
+    defaultTarget: 15,
+    tagline: 'Glutes and hamstrings.',
+    placement:
+        'Prop the phone 2 m away at the side, low to the floor, so your '
+        'shoulders, hips and knees are visible.',
+    cues: [
+      'Lie on your back, knees bent, feet flat and hip-width apart.',
+      'Drive through the heels until shoulders, hips and knees line up.',
+      'Squeeze at the top for a second, then lower slowly.',
+    ],
+  ),
+  wallSit(
+    id: 'wall_sit',
+    label: 'Wall sit',
+    singular: 'wall sit',
+    unit: ExerciseUnit.seconds,
+    defaultTarget: 30,
+    tagline: 'Quads on fire.',
+    placement:
+        'Prop the phone 2 m away at the side so your hips, knees and ankles '
+        'are visible.',
+    cues: [
+      'Back flat against the wall, slide down until the thighs are parallel.',
+      'Knees over the ankles, hands off the legs.',
+      'The timer only runs while you hold the angle.',
+    ],
+  ),
+  highKnees(
+    id: 'high_knees',
+    label: 'High knees',
+    singular: 'high knee',
+    unit: ExerciseUnit.reps,
+    defaultTarget: 30,
+    tagline: 'Cardio burst.',
+    placement:
+        'Face the camera or stand side-on 2–3 m away with your whole body in '
+        'frame.',
+    cues: [
+      'Run on the spot and drive each knee up to hip height.',
+      'Stay tall, pump the arms, land softly.',
+      'Every knee that reaches hip height counts.',
+    ],
+  ),
+  mountainClimber(
+    id: 'mountain_climber',
+    label: 'Mountain climbers',
+    singular: 'mountain climber',
+    unit: ExerciseUnit.reps,
+    defaultTarget: 20,
+    tagline: 'Core and cardio.',
+    placement:
+        'Prop the phone 2–3 m away at the side, low to the floor, with your '
+        'whole body in frame.',
+    cues: [
+      'Start in a high plank, hands under the shoulders.',
+      'Drive one knee towards the chest, switch legs quickly.',
+      'Keep the hips level and the back flat.',
+    ],
+  ),
+  tricepDip(
+    id: 'tricep_dip',
+    label: 'Tricep dips',
+    singular: 'tricep dip',
+    unit: ExerciseUnit.reps,
+    defaultTarget: 10,
+    tagline: 'Triceps and chest.',
+    placement:
+        'Prop the phone 2 m away at the side so your shoulders, elbows and '
+        'hips are visible.',
+    cues: [
+      'Hands on the edge of a bench or chair behind you, fingers forward.',
+      'Lower until the elbows reach about 90°, then press back up.',
+      'Keep the shoulders down and the back close to the bench.',
+    ],
+  ),
+  squatJump(
+    id: 'squat_jump',
+    label: 'Squat jumps',
+    singular: 'squat jump',
+    unit: ExerciseUnit.reps,
+    defaultTarget: 10,
+    tagline: 'Explosive legs.',
+    placement:
+        'Prop the phone 2–3 m away from the side or the front with your whole '
+        'body in frame, including the jump.',
+    cues: [
+      'Squat to parallel with the chest up.',
+      'Explode up, land softly and sink straight into the next rep.',
+      'Keep the knees tracking over the toes.',
+    ],
   );
 
   const ExerciseType({
@@ -130,14 +226,21 @@ enum ExerciseType {
 
   /// Spoken/shown when the body is visible but not in the start posture.
   String get positionHint => switch (this) {
-    ExerciseType.pushUp || ExerciseType.plank =>
+    ExerciseType.pushUp || ExerciseType.plank || ExerciseType.mountainClimber =>
       'Get into push-up position: hands on the floor, body '
           'straight',
     ExerciseType.squat ||
     ExerciseType.lunge ||
     ExerciseType.jumpingJack ||
+    ExerciseType.highKnees ||
+    ExerciseType.squatJump ||
     ExerciseType.burpee => 'Stand up straight with your whole body in frame',
-    ExerciseType.sitUp => 'Lie on your back with your knees bent',
+    ExerciseType.sitUp ||
+    ExerciseType.gluteBridge => 'Lie on your back with your knees bent',
+    ExerciseType.wallSit =>
+      'Sit against the wall with your thighs parallel to the floor',
+    ExerciseType.tricepDip =>
+      'Sit on the edge of a bench with your hands beside your hips',
   };
 
   /// Call-to-action for the home screen.

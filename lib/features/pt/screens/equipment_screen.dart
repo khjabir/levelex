@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app/theme.dart';
+import '../../../widgets/primary_button.dart';
+import '../data/equipment_detector.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/section_header.dart';
 import '../models/equipment.dart';
@@ -23,42 +25,91 @@ class EquipmentScreen extends ConsumerStatefulWidget {
 
 class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
   final _picker = ImagePicker();
+  EquipmentDetector? _detector;
+  bool _scanning = false;
 
-  Future<void> _attachPhoto(EquipmentItem item, ImageSource source) async {
-    XFile? file;
+  @override
+  void dispose() {
+    _detector?.dispose();
+    super.dispose();
+  }
+
+  Future<XFile?> _pick(ImageSource source) async {
     try {
-      file = await _picker.pickImage(
+      return await _picker.pickImage(
         source: source,
-        maxWidth: 1200,
+        maxWidth: 1280,
         imageQuality: 82,
       );
     } catch (e) {
       debugPrint('Image pick failed: $e');
+      return null;
     }
-    if (file == null || !mounted) return;
+  }
+
+  /// Copies a picked photo into the app's private folder for [type].
+  Future<String?> _store(XFile file, Equipment type) async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final folder = Directory('${dir.path}/equipment');
       await folder.create(recursive: true);
       final ext = file.path.split('.').last.toLowerCase();
       final target = File(
-        '${folder.path}/${item.type.name}_${DateTime.now().millisecondsSinceEpoch}.$ext',
+        '${folder.path}/${type.name}_${DateTime.now().millisecondsSinceEpoch}.$ext',
       );
       await File(file.path).copy(target.path);
-      final old = item.photoPath;
-      if (old != null && File(old).existsSync()) {
-        await File(old).delete();
-      }
-      await ref
-          .read(gymProfileProvider.notifier)
-          .update(item.copyWith(photoPath: target.path));
+      return target.path;
     } catch (e) {
       debugPrint('Saving equipment photo failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _attachPhoto(EquipmentItem item, ImageSource source) async {
+    final file = await _pick(source);
+    if (file == null || !mounted) return;
+    final path = await _store(file, item.type);
+    if (path == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not save the photo.')),
       );
+      return;
     }
+    final old = item.photoPath;
+    if (old != null && File(old).existsSync()) {
+      await File(old).delete();
+    }
+    await ref
+        .read(gymProfileProvider.notifier)
+        .update(item.copyWith(photoPath: path));
+  }
+
+  /// Photograph a piece of equipment, let the on-device labeler guess what
+  /// it is, confirm, and add it with the photo attached.
+  Future<void> _scan(ImageSource source) async {
+    final file = await _pick(source);
+    if (file == null || !mounted) return;
+    setState(() => _scanning = true);
+    final guesses = await (_detector ??= EquipmentDetector()).detect(file.path);
+    if (!mounted) return;
+    setState(() => _scanning = false);
+    final chosen = await showModalBottomSheet<Equipment>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _GuessSheet(photoPath: file.path, guesses: guesses),
+    );
+    if (chosen == null || !mounted) return;
+    final path = await _store(file, chosen);
+    final profile = ref.read(gymProfileProvider);
+    final existing = profile.item(chosen) ?? EquipmentItem(type: chosen);
+    await ref
+        .read(gymProfileProvider.notifier)
+        .update(existing.copyWith(photoPath: path ?? existing.photoPath));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${chosen.label} added to your gym.')),
+    );
   }
 
   Future<void> _editItem(EquipmentItem item) async {
@@ -203,6 +254,42 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
                         'your phone.'
                   : 'Got it: ${profile.items.length} items. Tap an item to add '
                         'a photo or a note about where it is.',
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: PrimaryButton(
+                    label: _scanning ? 'SCANNING…' : 'SCAN WITH CAMERA',
+                    icon: Icons.center_focus_strong_rounded,
+                    height: 54,
+                    loading: _scanning,
+                    onPressed: _scanning
+                        ? null
+                        : () => _scan(ImageSource.camera),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: _scanning
+                        ? null
+                        : () => _scan(ImageSource.gallery),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 54),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    child: const Icon(Icons.photo_library_outlined),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Point the camera at a machine or weight and I will try to '
+              'recognise it on-device. You always get the final say.',
+              style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 20),
             const SectionHeader('Tap to add or remove'),
@@ -362,6 +449,90 @@ class _EquipmentTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom sheet with the detector's best guesses and a manual fallback.
+class _GuessSheet extends StatelessWidget {
+  const _GuessSheet({required this.photoPath, required this.guesses});
+
+  final String photoPath;
+  final List<EquipmentGuess> guesses;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(photoPath),
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    guesses.isEmpty
+                        ? 'I could not recognise this one. Pick it below and '
+                              'I will keep the photo.'
+                        : 'My best guess. Tap the right one.',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            for (final g in guesses)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(equipmentIcon(g.type), color: AppColors.primary),
+                ),
+                title: Text(g.type.label),
+                subtitle: Text(
+                  'Confidence ${(g.confidence * 100).round()}% · ${g.evidence}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.of(context).pop(g.type),
+              ),
+            if (guesses.isNotEmpty) const Divider(height: 20),
+            Text('Something else', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final e in Equipment.values)
+                  if (!guesses.any((g) => g.type == e))
+                    ActionChip(
+                      avatar: Icon(equipmentIcon(e), size: 16),
+                      label: Text(e.label),
+                      onPressed: () => Navigator.of(context).pop(e),
+                    ),
+              ],
+            ),
+          ],
         ),
       ),
     );

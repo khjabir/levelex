@@ -47,6 +47,40 @@ void main() {
     expect(LevelSystem.xpForPtRecord(record(skipped: 2)), 30 * 8 + 60 * 2);
   });
 
+  test('XP counts active time, not paused time', () {
+    final r = PtRecord(
+      id: 'r2',
+      startTime: DateTime(2026, 10, 14, 7),
+      endTime: DateTime(2026, 10, 14, 8),
+      mode: WorkoutMode.push,
+      plannedMinutes: 30,
+      items: record().items,
+      verified: true,
+      activeSeconds: 20 * 60,
+    );
+    expect(r.duration, const Duration(minutes: 20));
+    expect(LevelSystem.xpForPtRecord(r), 20 * 8 + 120 * 2 + 40);
+    expect(PtRecord.fromMap(r.toMap()).activeSeconds, 20 * 60);
+  });
+
+  test('completion is measured against the whole plan', () {
+    final r = PtRecord(
+      id: 'r3',
+      startTime: DateTime(2026, 10, 14, 7),
+      endTime: DateTime(2026, 10, 14, 7, 10),
+      mode: WorkoutMode.push,
+      plannedMinutes: 30,
+      items: record().items.take(1).toList(),
+      verified: true,
+      plannedItems: 8,
+    );
+    expect(r.itemCount, 8);
+    expect(r.completion, 1 / 8);
+    expect(PtRecord.fromMap(r.toMap()).plannedItems, 8);
+    // Older records without a planned count fall back to their results.
+    expect(record().completion, 1);
+  });
+
   test('gym profile toggles, updates and serialises', () {
     var p = const GymProfile();
     p = p.toggle(Equipment.dumbbells).toggle(Equipment.bench);

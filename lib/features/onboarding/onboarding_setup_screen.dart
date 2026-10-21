@@ -35,6 +35,25 @@ class _OnboardingSetupScreenState extends ConsumerState<OnboardingSetupScreen> {
   void _update(UserSettings Function(UserSettings) change) =>
       setState(() => _draft = change(_draft));
 
+  /// Finishes onboarding with reminders off; they can be enabled later in
+  /// Settings.
+  Future<void> _skipReminders() async {
+    setState(() => _saving = true);
+    final now = DateTime.now();
+    await ref
+        .read(settingsProvider.notifier)
+        .updateSettings(
+          (_) => _draft.copyWith(
+            remindersEnabled: false,
+            onboardingCompleted: true,
+            setupCompletedAt: now,
+          ),
+        );
+    await ref.read(reminderControllerProvider.notifier).reschedule();
+    if (!mounted) return;
+    context.go(Routes.home);
+  }
+
   Future<void> _finish() async {
     if (_draft.reminderEndTime <= _draft.reminderStartTime) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -143,6 +162,16 @@ class _OnboardingSetupScreenState extends ConsumerState<OnboardingSetupScreen> {
               icon: Icons.bolt_rounded,
               loading: _saving,
               onPressed: _saving ? null : _finish,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _saving ? null : _skipReminders,
+              child: const Text('Set up reminders later'),
+            ),
+            Text(
+              'You can turn reminders on any time in Settings.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall,
             ),
           ],
         ),

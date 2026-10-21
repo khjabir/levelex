@@ -14,7 +14,8 @@ import '../../widgets/app_card.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/section_header.dart';
 import '../face/face_providers.dart';
-import 'widgets/exercise_demo.dart';
+import '../pt/mannequin/mannequin_3d.dart';
+import 'exercise_icons.dart';
 
 /// Training guide for the selected exercise: animated demo, how-to cues,
 /// common mistakes with their fixes, camera placement, then the start button.
@@ -51,6 +52,24 @@ class WorkoutIntroScreen extends ConsumerWidget {
     ExerciseType.burpee => [FormStatus.goDeeper, FormStatus.slowDown],
     ExerciseType.plank => [FormStatus.hipsTooLow, FormStatus.hipsTooHigh],
     ExerciseType.sitUp => [FormStatus.goDeeper, FormStatus.slowDown],
+    ExerciseType.gluteBridge => [FormStatus.goDeeper, FormStatus.slowDown],
+    ExerciseType.wallSit => [FormStatus.goDeeper],
+    ExerciseType.highKnees => [FormStatus.goDeeper, FormStatus.slowDown],
+    ExerciseType.mountainClimber => [
+      FormStatus.hipsTooHigh,
+      FormStatus.goDeeper,
+    ],
+    ExerciseType.tricepDip => [FormStatus.goDeeper, FormStatus.slowDown],
+    ExerciseType.squatJump => [FormStatus.goDeeper, FormStatus.torsoLeaning],
+  };
+
+  /// Mannequin parts to flag for a mistake.
+  static Set<String> highlightFor(FormStatus status) => switch (status) {
+    FormStatus.hipsTooHigh || FormStatus.hipsTooLow => {'hips', 'torso'},
+    FormStatus.torsoLeaning => {'torso'},
+    FormStatus.armsNotOverhead => {'arms'},
+    FormStatus.goDeeper => {'legs', 'arms'},
+    _ => <String>{},
   };
 
   @override
@@ -85,7 +104,19 @@ class WorkoutIntroScreen extends ConsumerWidget {
                             padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                             child: Column(
                               children: [
-                                ExerciseDemo(exercise: exercise, size: 210),
+                                SizedBox(
+                                  height: 230,
+                                  child: Mannequin3D(
+                                    key: ValueKey(exercise.clipId),
+                                    clipId: exercise.clipId,
+                                  ),
+                                ),
+                                Text(
+                                  'Drag to rotate the guide',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontSize: 11,
+                                  ),
+                                ),
                                 const SizedBox(height: 8),
                                 Text(
                                   exercise.tagline,
@@ -304,38 +335,17 @@ class _MistakeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (showDemo)
-              Center(
-                child: ExerciseDemo(
-                  exercise: exercise,
-                  variant: DemoVariant.mistake,
-                  size: 96,
-                  showFloor: false,
-                ),
-              )
-            else
-              Container(
-                width: 96,
-                height: 96,
-                alignment: Alignment.center,
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.14),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    status == FormStatus.goDeeper
-                        ? Icons.south_rounded
-                        : status == FormStatus.slowDown
-                        ? Icons.speed_rounded
-                        : Icons.arrow_downward_rounded,
-                    color: AppColors.warning,
-                    size: 28,
-                  ),
-                ),
+            SizedBox(
+              height: 96,
+              child: Mannequin3D(
+                clipId: exercise.clipId,
+                interactive: false,
+                autoRotate: showDemo,
+                compact: true,
+                showFloor: false,
+                highlight: WorkoutIntroScreen.highlightFor(status),
               ),
+            ),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -347,13 +357,7 @@ class _MistakeCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    showDemo
-                        ? (DemoClips.clip(
-                                exercise,
-                                DemoVariant.mistake,
-                              ).label ??
-                              cue.title)
-                        : cue.title,
+                    cue.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(
