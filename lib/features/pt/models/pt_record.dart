@@ -130,6 +130,13 @@ class PtRecord {
       items.fold(0, (s, i) => s + i.mistakes.values.fold(0, (a, b) => a + b));
   double get completion => itemCount == 0 ? 0 : itemsDone / itemCount;
 
+  /// Some work was done (a finished set, or reps or seconds logged),
+  /// verified or not. A session ended before any work has none and does
+  /// not count as activity anywhere: heatmap, calendar or routine day.
+  bool get hasWork => items.any(
+    (i) => !i.skipped && (i.setsDone > 0 || i.reps > 0 || i.seconds > 0),
+  );
+
   /// Verified and some work was done: covers any reminder whose window the
   /// session overlaps, like an attempted push-up set.
   bool get isAttempted =>

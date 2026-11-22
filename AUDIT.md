@@ -1,7 +1,7 @@
 # App audit, November 2026
 
 Every issue found in the audit and what was done about it. "Fixed" items
-are covered by the test suite (695 tests) unless noted.
+are covered by the test suite (701 tests) unless noted.
 
 ## 1. Rep detection: workouts not identified
 
@@ -96,6 +96,7 @@ to film those from the side or a diagonal.
 | Tomorrow's streak nudge claimed a streak that would have broken | Its own text |
 | Weigh-ins moved a day after changing time zone (undeletable, duplicates) | The calendar day is stored |
 | Backup import parsed every MY PT record once per record | Batched |
+| A MY PT session ended before any work lit up the Progress heatmap and the History calendar | Only sessions with work count, the same rule as routine days; the Progress streak is labelled "verified" (it never counted unverified work) |
 
 ## 5. Screens and navigation
 
@@ -113,6 +114,7 @@ to film those from the side or a diagonal.
 | Weigh-in accepted any number ("800" for "80.0") | 20-400 kg (45-880 lb) |
 | "Bodyweight only" wiped the gym with one tap | Confirmation; photos deleted |
 | Cold start from a reminder had no home underneath (back closed the app) | Opens over home |
+| The 3D guide's floor grid drew past its card into the card below | Clipped to the guide, and fades out before the edges |
 
 ## 6. Left as designed (your call)
 

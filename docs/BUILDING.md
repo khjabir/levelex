@@ -73,8 +73,8 @@ flutter build apk --release
 ```
 
 Output: `build/app/outputs/flutter-apk/app-release.apk` (about 200 MB,
-because it carries native libraries for three CPU types). A per-device APK
-is about half that:
+because it carries native libraries for three CPU types). Per-device APKs
+are 86 MB (64-bit) and 72 MB (32-bit):
 
 ```bash
 flutter build apk --release --split-per-abi

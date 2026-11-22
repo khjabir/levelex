@@ -52,6 +52,9 @@ tool/
   figure/              Blender build script for the 3D body
   pose_probe/          ML Kit probe app for measuring the counters
   logo/                CoreGraphics generator for the icon and splash
+  release/             builds the files for a GitHub release
+  website/             makes the website's copy of the 3D body
+website/               the project website (static, served by Vercel)
 ```
 
 State is managed with Riverpod 3 and navigation with go_router. Analyzers,

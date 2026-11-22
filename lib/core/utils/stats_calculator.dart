@@ -32,7 +32,7 @@ abstract final class StatsCalculator {
     var ptCompleted = 0;
     for (final r in ptRecords) {
       if (!AppDateUtils.isSameDay(r.startTime, date)) continue;
-      pt++;
+      if (r.hasWork) pt++;
       if (r.isCompleted) ptCompleted++;
       reps += r.totalReps;
     }

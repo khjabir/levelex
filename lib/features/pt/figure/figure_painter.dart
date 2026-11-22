@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' as vm;
 
 import '../../../app/theme.dart';
+import '../mannequin/mannequin_painter.dart' show guideGridPaint;
 import '../mannequin/rig.dart';
 import 'figure_model.dart';
 
@@ -86,6 +87,9 @@ class FigurePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // The floor reaches past the body; keep it inside the guide's own box
+    // instead of drawing over the card below.
+    canvas.clipRect(Offset.zero & size);
     final m = model;
     if (blend < 1 && fromAnimation != null) {
       m.sampleBlend(fromAnimation, fromTime, animation, time, blend);
@@ -496,11 +500,13 @@ class FigurePainter extends CustomPainter {
               .storage,
         ),
     );
-    final grid = Paint()
-      ..color = Colors.white.withValues(alpha: 0.07)
-      ..strokeWidth = 1;
     const extent = 1.4;
     const step = 0.35;
+    final grid = guideGridPaint(
+      centre,
+      (project(extent, 0, 0) - centre).distance,
+      size,
+    );
     for (var i = -extent; i <= extent + 1e-6; i += step) {
       canvas.drawLine(project(i, 0, -extent), project(i, 0, extent), grid);
       canvas.drawLine(project(-extent, 0, i), project(extent, 0, i), grid);

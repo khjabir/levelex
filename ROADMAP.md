@@ -31,7 +31,21 @@ These are product calls to make before the related work starts.
 
 ### Before a public release
 
-1. **Field-test the new counting on real people.**
+1. **Create the Android release key, then publish the first release.**
+   - Why: the website's download buttons point at GitHub's latest release,
+     and there is none yet. Without `android/key.properties`, release builds
+     are signed with the build machine's debug key, and Android installs an
+     update only over an app signed with the same key: everyone would have
+     to uninstall, losing their history, to move to a properly signed build.
+   - Where: [docs/RELEASING.md](docs/RELEASING.md) (keystore, then
+     `tool/release/build_release.sh --ios`, then a GitHub release tagged
+     `v1.0.0`).
+   - Done when: the website shows the version and its download buttons
+     install the app on a phone.
+2. **Deploy the website on Vercel.**
+   - Where: import the repository in Vercel and keep the defaults;
+     `vercel.json` serves `website/`. Optionally add a custom domain.
+3. **Field-test the new counting on real people.**
    - Why: the rep-counting rework was measured with Google ML Kit on
      rendered videos of the 3D athlete, run on an emulator. It has not yet
      been tried on a real phone with a real person, real clothing and real
@@ -42,35 +56,15 @@ These are product calls to make before the related work starts.
      (`test/fixtures/`, `test/support/pose_replay.dart`).
    - Done when: every exercise counts within one rep from its recommended
      placements, and the real recordings run in `flutter test`.
-2. **Verify the iOS build on a device.**
+4. **Verify the iOS build on a device.**
    - Why: the audit changed iOS-specific behaviour (the completion chime's
      audio session, app lifecycle handling, wakelock) and the iPhone was
-     unavailable, so none of it has run on iOS.
-   - Done when: a camera set, a MY PT session and a challenge round complete
-     on the iPhone with the voice coach audible in silent mode.
-3. **Progress heatmap counts empty MY PT sessions.**
-   - Why: a MY PT session ended before any work still lights up a day on
-     the Progress heatmap. The routine logic already ignores such sessions.
-     The screen can also read "3 active days" next to "longest streak 0",
-     because the heatmap counts unverified sets and hand-logged lifts while
-     the streak counts verified work only.
-   - Where: `lib/features/strength/screens/progress_screen.dart` (the
-     `r.items.isNotEmpty` check); use the same rule as `routineRunsProvider`
-     (`!i.skipped && i.setsDone > 0`), and label the streak as "verified".
-   - Done when: an empty session leaves the heatmap unchanged, with a test.
-4. **3D guide floor grid draws outside its card.**
-   - Why: the grid lines run past the card's rounded border into the card
-     below (visible on exercise intros and the library detail screen).
-   - Where: clip `FigurePainter` and `MannequinPainter` (or the `Guide3D`
-     card) to the card's rounded rectangle.
-5. **Cut the Android download size.**
-   - Why: the release APK is 199 MB because it carries native libraries for
-     three CPU types, including x86_64, which only emulators use.
-   - Where: publish an app bundle for Play, and per-ABI APKs
-     (`flutter build apk --split-per-abi`) for direct installs; leave x86_64
-     out of release builds.
-   - Done when: an arm64 install is about 100 MB or less.
-6. **Floor exercises filmed end-on.**
+     unavailable, so none of it has run on iOS. The sideloading steps on the
+     website also need one run-through.
+   - Done when: the unsigned IPA installs through Sideloadly, and a camera
+     set, a MY PT session and a challenge round complete with the voice
+     coach audible in silent mode.
+5. **Floor exercises filmed end-on.**
    - Why: 7 of the 78 measured sequences still miss reps: glute bridges and
      sit-ups filmed from the head or feet, and mountain climbers from the
      front, far away or a diagonal. The tips tell people to film from the
@@ -78,31 +72,38 @@ These are product calls to make before the related work starts.
    - Where: see the placement assistant below; then try the accurate ML Kit
      model for floor exercises (73 of 78 right against the base model's 71).
 
+Done since the audit: the Progress heatmap and History calendar no longer
+count a MY PT session ended before any work, the Progress streak is labelled
+as counting verified workouts, the 3D guide's floor grid stays inside its
+card, and releases ship per-device APKs (86 MB for 64-bit phones instead of
+the 199 MB all-in-one APK).
+See [AUDIT.md](AUDIT.md).
+
 ### Soon after
 
-7. **End-to-end test of a camera set.**
+6. **End-to-end test of a camera set.**
    - Why: no automated test drives intro → camera → counting → summary. The
      camera screen cannot even be reached on an emulator without a
      registered face.
    - Where: a debug-only fake pose source fed from the replay fixtures, and a
      debug face bypass, used by a new `integration_test/` suite.
-8. **Continuous integration.**
-   - Why: format, analyze and the 695 tests only run when someone remembers.
+7. **Continuous integration.**
+   - Why: format, analyze and the 701 tests only run when someone remembers.
    - Where: a GitHub Actions workflow for `dart format --set-exit-if-changed`,
      `flutter analyze`, `flutter test` and a release build. Add a layout
      test that opens every screen on a small phone at 2× text and fails on
      overflow (the audit's sweep ran outside the test suite).
-9. **Reminder gaps.**
+8. **Reminder gaps.**
    - Overnight reminder windows (end time before start time) are not
      supported.
    - Skipped sessions are only evaluated when the app runs.
    - Some Android makers' battery optimisers delay or drop reminders; add
      in-app guidance for the detected manufacturer.
-10. **Liveness for the face check.**
+9. **Liveness for the face check.**
     - Why: a good photo of the registered user can pass verification.
     - Where: ask for a blink or a head turn using ML Kit face
       classification (eye-open probability, head angles) in `FaceService`.
-11. **Upgrade `permission_handler` to 13.x** once Flutter's Android template
+10. **Upgrade `permission_handler` to 13.x** once Flutter's Android template
     supports compile SDK 37 (see [docs/BUILDING.md](docs/BUILDING.md)).
 
 ## Next features

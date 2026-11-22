@@ -24,6 +24,7 @@ camera frames never leave the device.
 
 ## Contents
 
+- [Install the app](#install-the-app)
 - [Features](#features)
 - [Supported exercises](#supported-exercises)
 - [Getting started](#getting-started)
@@ -36,6 +37,20 @@ camera frames never leave the device.
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License and credits](#license-and-credits)
+
+## Install the app
+
+Levelex is not in Google Play or the App Store. It is installed from the
+project's [GitHub releases](https://github.com/khjabir/levelex/releases):
+
+- **Android 7.0+:** download `levelex-android-arm64.apk` on the phone, allow
+  installs from your browser when asked, and install.
+- **iPhone (iOS 15.5+):** sideload `levelex-ios-unsigned.ipa` with
+  Sideloadly or AltStore and your Apple ID, or build it with Xcode.
+
+The project website (in [`website/`](website/), deployed on Vercel) walks
+through both step by step. Maintainers: [docs/RELEASING.md](docs/RELEASING.md)
+covers signing, publishing a release and deploying the site.
 
 ## Features
 
@@ -130,7 +145,9 @@ flutter build ipa --release --export-method development
 ```
 
 Release signing, the Android R8 rules, unsigned IPAs and other platform
-details are in [docs/BUILDING.md](docs/BUILDING.md).
+details are in [docs/BUILDING.md](docs/BUILDING.md). To build every file a
+GitHub release needs, with the names the website links to, run
+`tool/release/build_release.sh` (see [docs/RELEASING.md](docs/RELEASING.md)).
 
 ## Testing
 
@@ -142,7 +159,7 @@ flutter test
 flutter analyze
 ```
 
-The suite (695 tests) covers the rep engine and every exercise analyzer
+The suite (701 tests) covers the rep engine and every exercise analyzer
 with synthetic bodies from several camera views, false positives such as a
 hand in front of the lens, coaching, XP and levels, streaks, reminders,
 face matching, progression, imports, and widget tests for the share cards,
@@ -170,8 +187,10 @@ lib/
     ...         home, history, engagement, settings, onboarding, face
   widgets/      shared UI components
 test/           unit and widget tests, ML Kit replay fixtures, previews
-tool/           3D body build script, ML Kit probe app, logo generator
-docs/           architecture, features, building, screenshots
+tool/           3D body build, ML Kit probe app, release script, logo, website GLB
+docs/           architecture, features, building, releasing, screenshots
+website/        the project website (static HTML/CSS/JS)
+vercel.json     serves website/ when the repository is imported into Vercel
 ```
 
 ## How it works
@@ -242,10 +261,9 @@ measured against the real detector, are in
 
 ## Roadmap
 
-Next up, in priority order: field-testing the new counting on real people,
-verifying the iOS build, a few bugs found in review (an empty MY PT session
-lights up the Progress heatmap, and the 3D guide's floor grid draws outside
-its card), a smaller Android download, and a placement assistant that tells
+Next up, in priority order: creating the Android release key and publishing
+the first release, deploying the website, field-testing the new counting on
+real people, verifying the iOS build, and a placement assistant that tells
 you when the phone is at a poor angle. The full list, with open product
 decisions, is in [ROADMAP.md](ROADMAP.md). Everything fixed in the November
 2026 audit is in [AUDIT.md](AUDIT.md).

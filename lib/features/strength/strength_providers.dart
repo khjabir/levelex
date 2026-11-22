@@ -206,9 +206,7 @@ final routineRunsProvider = Provider<List<RoutineRun>>(
   (ref) => [
     for (final r in ref.watch(ptRecordsProvider))
       // A session ended before any work does not use up the routine day.
-      if (r.routineId != null &&
-          r.routineDayId != null &&
-          r.items.any((i) => !i.skipped && i.setsDone > 0))
+      if (r.routineId != null && r.routineDayId != null && r.hasWork)
         (routineId: r.routineId!, dayId: r.routineDayId!, at: r.startTime),
   ],
 );

@@ -10,10 +10,12 @@ import '../../../app/routes.dart';
 import '../../../app/theme.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/stats_calculator.dart';
+import '../../../models/workout_session.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/section_header.dart';
 import '../../pt/models/movement_library.dart';
 import '../../pt/models/muscle_group.dart';
+import '../../pt/models/pt_record.dart';
 import '../../pt/pt_providers.dart';
 import '../logic/body_weight_stats.dart';
 import '../logic/records.dart';
@@ -22,6 +24,34 @@ import '../models/lift_log.dart';
 import '../strength_providers.dart';
 import '../widgets/activity_heatmap.dart';
 import '../widgets/muscle_map.dart';
+
+/// Workouts per calendar day for the activity heatmap: camera sets with reps,
+/// MY PT sessions in which some work was done, and lifts logged by hand
+/// (MY PT's own lift-log copies are already counted through the session).
+/// Unverified work counts here; the streak below it does not.
+@visibleForTesting
+Map<DateTime, int> activityByDay({
+  required Iterable<WorkoutSession> sessions,
+  required Iterable<PtRecord> ptRecords,
+  required Iterable<LiftEntry> lifts,
+}) {
+  final activity = <DateTime, int>{};
+  void bump(DateTime t) {
+    final d = AppDateUtils.dateOnly(t);
+    activity[d] = (activity[d] ?? 0) + 1;
+  }
+
+  for (final s in sessions) {
+    if (s.completedReps > 0 && !s.skipped) bump(s.startTime);
+  }
+  for (final r in ptRecords) {
+    if (r.hasWork) bump(r.startTime);
+  }
+  for (final e in lifts) {
+    if (e.source != LiftSource.pt) bump(e.startTime);
+  }
+  return activity;
+}
 
 /// The long view: a year of activity, which muscles are fresh, your
 /// records, weekly volume and body weight.
@@ -45,22 +75,11 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
     final bodyWeights = ref.watch(bodyWeightProvider);
     final now = DateTime.now();
 
-    // Activity: every occasion counts once per day.
-    final activity = <DateTime, int>{};
-    void bump(DateTime t) {
-      final d = AppDateUtils.dateOnly(t);
-      activity[d] = (activity[d] ?? 0) + 1;
-    }
-
-    for (final s in sessions) {
-      if (s.completedReps > 0 && !s.skipped) bump(s.startTime);
-    }
-    for (final r in ptRecords) {
-      if (r.items.isNotEmpty) bump(r.startTime);
-    }
-    for (final e in lifts) {
-      if (e.source != LiftSource.pt) bump(e.startTime);
-    }
+    final activity = activityByDay(
+      sessions: sessions,
+      ptRecords: ptRecords,
+      lifts: lifts,
+    );
     final activeDays = activity.length;
     final restWeekdays = ref.watch(
       settingsProvider.select((s) => s.restWeekdays),
@@ -130,7 +149,9 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
                 Padding(
                   padding: const EdgeInsets.only(left: 6),
                   child: Text(
-                    'Streak $streak day${streak == 1 ? '' : 's'} · '
+                    // The heatmap shows all activity; the streak, like the
+                    // home screen's, counts verified workouts only.
+                    'Verified streak $streak day${streak == 1 ? '' : 's'} · '
                     'longest $longest',
                     style: theme.textTheme.bodySmall,
                   ),

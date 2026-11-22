@@ -1,10 +1,42 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
 import '../../../core/utils/geometry.dart';
 import 'rig.dart';
+
+/// Paint for the 3D guide's floor grid: faint under the body and fading to
+/// nothing before the edges of the guide's box, so the floor has no hard
+/// edge. [centre] is the floor point under the body and [halfWidth] the
+/// grid's projected half-width.
+Paint guideGridPaint(Offset centre, double halfWidth, Size size) {
+  final rx = [
+    halfWidth,
+    centre.dx,
+    size.width - centre.dx,
+  ].reduce(math.min).clamp(1.0, double.infinity);
+  final ry = (size.height - centre.dy).clamp(1.0, rx);
+  return Paint()
+    ..strokeWidth = 1
+    ..shader = ui.Gradient.radial(
+      centre,
+      rx,
+      [
+        Colors.white.withValues(alpha: 0.08),
+        Colors.white.withValues(alpha: 0.06),
+        Colors.white.withValues(alpha: 0.0),
+      ],
+      const [0.0, 0.6, 1.0],
+      TileMode.clamp,
+      (Matrix4.identity()
+            ..translateByDouble(0, centre.dy, 0, 1)
+            ..scaleByDouble(1, ry / rx, 1, 1)
+            ..translateByDouble(0, -centre.dy, 0, 1))
+          .storage,
+    );
+}
 
 /// Software-rendered mannequin: perspective projection, painter's-algorithm
 /// depth sorting, shaded capsules for limbs, a filled torso and pelvis, a
@@ -49,6 +81,9 @@ class MannequinPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // The floor reaches past the body; keep it inside the guide's own box
+    // instead of drawing over the card below.
+    canvas.clipRect(Offset.zero & size);
     final joints = {
       for (final e in Rig.solve(pose).entries) e.key: e.value + offset,
     };
@@ -254,11 +289,11 @@ class MannequinPainter extends CustomPainter {
     (Offset, double) Function(Vec3) project,
     Map<String, Vec3> joints,
   ) {
-    final grid = Paint()
-      ..color = Colors.white.withValues(alpha: 0.07)
-      ..strokeWidth = 1;
     const extent = 1.4;
     const step = 0.35;
+    final (centre, _) = project(Vec3(0, 0, 0));
+    final (edge, _) = project(Vec3(extent, 0, 0));
+    final grid = guideGridPaint(centre, (edge - centre).distance, size);
     for (var i = -extent; i <= extent + 1e-6; i += step) {
       final (a, _) = project(Vec3(i, 0, -extent));
       final (b, _) = project(Vec3(i, 0, extent));

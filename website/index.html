@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Levelex: your phone counts the reps</title>
+  <meta name="description" content="Levelex is a free workout coach for Android and iPhone. The camera counts your push-ups, squats, burpees and more, corrects your form out loud, and turns every rep into XP. Everything runs on your phone.">
+  <meta name="theme-color" content="#07090E">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Levelex: your phone counts the reps">
+  <meta property="og:description" content="A free, on-device workout coach. Camera rep counting, live form coaching, a 3D-guided personal trainer, levels and streaks.">
+  <meta property="og:image" content="/assets/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
+  <script src="/main.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="nav" id="top">
+    <div class="wrap nav__inner">
+      <a class="brand" href="#top" aria-label="Levelex home">
+        <img src="/assets/icon-512.png" alt="" width="32" height="32">
+        <span>LEVELEX</span>
+      </a>
+      <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-links">
+        <span class="sr-only">Menu</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <nav id="nav-links" class="nav__links" aria-label="Main">
+        <a href="#features">Features</a>
+        <a href="#guide">3D guide</a>
+        <a href="#exercises">Exercises</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#faq">FAQ</a>
+        <a class="btn btn--small btn--primary" href="#install">Install</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap hero__inner">
+        <div class="hero__copy">
+          <p class="eyebrow">Free · No account · Works offline</p>
+          <h1>Your phone counts the reps. <span class="grad">You level up.</span></h1>
+          <p class="lede">Levelex is a workout coach that watches through your camera. It counts
+            push-ups, squats, burpees and ten more exercises, corrects your form out loud, and
+            turns every rep into XP. Everything runs on your phone.</p>
+          <div class="cta">
+            <a class="btn btn--primary" href="#install-android" data-install="android">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+              Download for Android
+            </a>
+            <a class="btn btn--ghost" href="#install-ios" data-install="ios">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>
+              Install on iPhone
+            </a>
+          </div>
+          <p class="hero__meta">Android 7.0+ · iOS 15.5+ · <span data-release-version>Latest release on GitHub</span></p>
+        </div>
+        <div class="hero__phones" aria-hidden="true">
+          <figure class="phone phone--back"><img src="/assets/shots/guide.jpg" alt="" width="540" height="1200"></figure>
+          <figure class="phone phone--front"><img src="/assets/shots/home.jpg" alt="" width="540" height="1200"></figure>
+        </div>
+      </div>
+    </section>
+
+    <aside class="wrap notice" aria-label="Where to get Levelex">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      <p><strong>Not in Google Play or the App Store.</strong> Levelex is installed straight from its
+        official releases on GitHub. The <a href="#install">install guide</a> takes about two minutes on
+        Android, a little longer on iPhone.</p>
+    </aside>
+
+    <!-- Features -->
+    <section class="section" id="features">
+      <div class="wrap">
+        <p class="eyebrow">What it does</p>
+        <h2>A coach in your pocket, not in the cloud</h2>
+        <div class="features">
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            <h3>Camera rep counting</h3>
+            <p>Thirteen exercises counted from the side, the front or a diagonal, in portrait or landscape. Fast moves like burpees and jumping jacks included.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>
+            <h3>A coach that talks</h3>
+            <p>Live cues like “go lower” and “hips up”, a 3-2-1 countdown, every rep called out, and notes after the set on what to fix next time.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+            <h3>MY PT, your trainer</h3>
+            <p>Pick a time and a focus. Get a warm-up, workout and cool-down built around the equipment you own, guided move by move with rest timers.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
+            <h3>3D movement guides</h3>
+            <p>A realistic 3D athlete demonstrates more than 60 movements and lights up the muscles that do the work. Drag to see any angle.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8M9 17h6"/></svg>
+            <h3>Levels and streaks</h3>
+            <p>XP for every rep, a new daily challenge, streaks that respect your rest days, 30 badges and a weekly report. Climb from Rookie to Legend.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10v4M6 7v10M18 7v10M21 10v4M6 12h12"/></svg>
+            <h3>Strength log</h3>
+            <p>Track loads, follow proven progression rules, catch personal records, and see which muscles have recovered. Import from Strong, Hevy or FitNotes.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 0 1 5 5.5"/></svg>
+            <h3>Challenge friends</h3>
+            <p>Take turns in front of one phone: most reps in a minute, or first to a target. The same counting for everyone, and a podium at the end.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+            <h3>Private by design</h3>
+            <p>No account, no ads, no analytics. Camera frames are analysed on the phone and thrown away. Your history stays on your device.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3D guide -->
+    <section class="section section--tint" id="guide">
+      <div class="wrap guide">
+        <div class="guide__stage">
+          <model-viewer id="athlete" src="/assets/athlete.glb" alt="A 3D athlete demonstrating the selected exercise"
+            camera-controls touch-action="pan-y" disable-zoom interaction-prompt="none"
+            autoplay animation-name="push_up" animation-crossfade-duration="400"
+            camera-target="0m 0.46m 0.04m" camera-orbit="64deg 74deg 5.2m"
+            min-camera-orbit="auto 20deg 2m" max-camera-orbit="auto 100deg 14m"
+            field-of-view="30deg" shadow-intensity="1" shadow-softness="0.8" exposure="1.05"
+            environment-image="neutral" loading="lazy">
+            <div class="guide__loading" slot="progress-bar"><span></span></div>
+          </model-viewer>
+          <noscript><p class="guide__noscript">Turn on JavaScript to see the 3D guide.</p></noscript>
+          <p class="guide__hint">Drag to rotate</p>
+        </div>
+        <div class="guide__copy">
+          <p class="eyebrow">3D guide</p>
+          <h2>See the move before you make it</h2>
+          <p>This is the same athlete that demonstrates every movement in the app. Working muscles light up in
+            green, helping muscles in a softer shade. Pick an exercise:</p>
+          <div class="chips" role="radiogroup" aria-label="Exercise to demonstrate" id="clip-chips">
+            <button type="button" class="chip" role="radio" aria-checked="true" data-clip="push_up">Push-ups</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="squat">Squats</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="burpee">Burpees</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="jumping_jack">Jumping jacks</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="lunge">Lunges</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="mountain_climbers">Mountain climbers</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="sit_up">Sit-ups</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="glute_bridge">Glute bridges</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="high_knees">High knees</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="dip">Tricep dips</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="squat_jump">Squat jumps</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="plank">Plank</button>
+            <button type="button" class="chip" role="radio" aria-checked="false" data-clip="wall_sit">Wall sit</button>
+          </div>
+          <p class="guide__muscles" aria-live="polite">
+            <span class="legend"><span class="dot dot--primary"></span>Working: <strong id="muscles-primary">chest, triceps</strong></span>
+            <span class="legend" id="legend-secondary"><span class="dot dot--secondary"></span>Helping: <strong id="muscles-secondary">shoulders, core</strong></span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it counts -->
+    <section class="section" id="how">
+      <div class="wrap">
+        <p class="eyebrow">How it works</p>
+        <h2>Prop it up, move, level up</h2>
+        <ol class="steps">
+          <li class="card">
+            <span class="steps__n">1</span>
+            <h3>Prop up your phone</h3>
+            <p>Two to three metres away, with your whole body in frame. Each exercise tells you where the phone works best.</p>
+          </li>
+          <li class="card">
+            <span class="steps__n">2</span>
+            <h3>Move</h3>
+            <p>On-device pose detection follows 33 points on your body about 12 times a second. The coach counts, cues and keeps time.</p>
+          </li>
+          <li class="card">
+            <span class="steps__n">3</span>
+            <h3>Level up</h3>
+            <p>Every rep earns XP. Finish the set, keep the streak, beat your best, and watch the level climb.</p>
+          </li>
+        </ol>
+        <div class="explain card">
+          <h3>Why it counts the way you would</h3>
+          <p>Each exercise is measured against your own top position. For push-ups that is how far your shoulders
+            drop towards your hands; for squats, how far your hips drop towards your feet. That reads the same
+            from the side, the front or a diagonal, near or far. Rules for what must move and what must stay
+            planted stop waving arms, walking or a hand near the lens from ever counting, and a shallow rep is
+            flagged instead of counted.</p>
+          <p>The counters are tested against recordings of Google's ML Kit pose detector from six phone
+            placements. 71 of 78 recorded sets were counted exactly; the misses were floor exercises filmed from
+            the head or feet, which is why the app suggests where to put the phone.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Exercises -->
+    <section class="section section--tint" id="exercises">
+      <div class="wrap">
+        <p class="eyebrow">Camera-tracked exercises</p>
+        <h2>Thirteen moves, counted and coached</h2>
+        <p class="section__lede">MY PT adds 60+ more movements, from curls and presses to stretches, with gym
+          movements counted where the camera can follow them.</p>
+        <ul class="exercises">
+          <li><h3>Push-ups</h3><p>Shoulders dropping towards the hands.</p><p class="tip">Side or front, 2–3 m, a little above the floor.</p></li>
+          <li><h3>Squats</h3><p>Hips dropping towards the ankles.</p><p class="tip">Side or front, 2–3 m, head to feet in frame.</p></li>
+          <li><h3>Lunges</h3><p>Hips dropping over the planted foot.</p><p class="tip">From the side, 2–3 m.</p></li>
+          <li><h3>Squat jumps</h3><p>The squat, then the jump.</p><p class="tip">Side or front, with room above you.</p></li>
+          <li><h3>Burpees</h3><p>Down to the floor with the hands planted, and back up.</p><p class="tip">Side or front, about 3 m.</p></li>
+          <li><h3>Jumping jacks</h3><p>Arms overhead and feet apart.</p><p class="tip">Facing you or side-on, 2–3 m.</p></li>
+          <li><h3>High knees</h3><p>Every knee drive counts.</p><p class="tip">Facing you or side-on, 2–3 m.</p></li>
+          <li><h3>Mountain climbers</h3><p>Every knee drive counts.</p><p class="tip">Side or diagonal, low; not at your head.</p></li>
+          <li><h3>Sit-ups</h3><p>Shoulders rising above the hips.</p><p class="tip">Side or diagonal, low; not at your head or feet.</p></li>
+          <li><h3>Glute bridges</h3><p>Hips rising above the shoulders.</p><p class="tip">Side or diagonal, about 2 m, low.</p></li>
+          <li><h3>Tricep dips</h3><p>Shoulders dropping towards the hands.</p><p class="tip">From the side, about 2 m.</p></li>
+          <li><h3>Plank</h3><p>Timed while your body stays in line.</p><p class="tip">From the side, low to the floor.</p></li>
+          <li><h3>Wall sit</h3><p>Timed while your thighs stay level.</p><p class="tip">From the side, about 2 m.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Screens -->
+    <section class="section" id="screens">
+      <div class="wrap">
+        <p class="eyebrow">Inside the app</p>
+        <h2>Made for a quick set between everything else</h2>
+      </div>
+      <div class="gallery" tabindex="0" aria-label="App screenshots, scroll sideways">
+        <figure><div class="phone"><img src="/assets/shots/home.jpg" alt="Home screen: level, daily challenge, MY PT and quick actions" width="540" height="1200" loading="lazy"></div><figcaption>Level, daily challenge and today's plan</figcaption></figure>
+        <figure><div class="phone"><img src="/assets/shots/my-pt.jpg" alt="MY PT: choose how long you have and what to train" width="540" height="1200" loading="lazy"></div><figcaption>MY PT builds a session in seconds</figcaption></figure>
+        <figure><div class="phone"><img src="/assets/shots/guide.jpg" alt="A 3D guide demonstrating an air squat with the quads lit" width="540" height="1200" loading="lazy"></div><figcaption>A 3D guide for every movement</figcaption></figure>
+        <figure><div class="phone"><img src="/assets/shots/library.jpg" alt="Exercise library with 62 movements" width="540" height="1200" loading="lazy"></div><figcaption>A library of 60+ movements</figcaption></figure>
+        <figure><div class="phone"><img src="/assets/shots/progress.jpg" alt="Progress: 26-week activity heatmap and muscle recovery map" width="540" height="1200" loading="lazy"></div><figcaption>Progress and muscle recovery</figcaption></figure>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section class="section section--tint" id="privacy">
+      <div class="wrap privacy">
+        <div>
+          <p class="eyebrow">Privacy</p>
+          <h2>What happens on your phone stays on your phone</h2>
+          <p>Levelex has no servers to send anything to. There is no account to create, no analytics and no
+            advertising.</p>
+        </div>
+        <ul class="checks">
+          <li><strong>Camera frames</strong> are analysed in memory and discarded. Nothing is recorded or uploaded.</li>
+          <li><strong>Your face</strong>, if you register it, is stored as a list of numbers, never as a photo. Erase it any time.</li>
+          <li><strong>Your history, photos and equipment</strong> stay in the app's private storage.</li>
+          <li><strong>Backups and share cards</strong> leave the phone only when you share them yourself.</li>
+          <li><strong>Permissions:</strong> the camera, notifications if you want reminders, and (optional, on Android) exact alarms for reminders on the minute. Nothing else.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section class="section" id="install">
+      <div class="wrap">
+        <p class="eyebrow">Install</p>
+        <h2>Get Levelex on your phone</h2>
+        <p class="section__lede">Levelex is not in the app stores, so you install it from the project's official
+          releases. Only download it from this site or
+          <a href="https://github.com/khjabir/levelex/releases">github.com/khjabir/levelex/releases</a>.</p>
+
+        <div class="release-note" id="no-release" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          <p><strong>The first public build is on its way.</strong> Until it is published, you can build Levelex
+            yourself (see “From source” below), or watch the
+            <a href="https://github.com/khjabir/levelex">GitHub repository</a> to hear when it lands.</p>
+        </div>
+
+        <div class="tabs">
+          <div class="tabs__list" role="tablist" aria-label="Platform">
+            <button type="button" role="tab" id="tab-android" aria-controls="install-android" aria-selected="true">Android</button>
+            <button type="button" role="tab" id="tab-ios" aria-controls="install-ios" aria-selected="false" tabindex="-1">iPhone</button>
+            <button type="button" role="tab" id="tab-source" aria-controls="install-source" aria-selected="false" tabindex="-1">From source</button>
+          </div>
+
+          <!-- Android -->
+          <div class="tabs__panel" role="tabpanel" id="install-android" aria-labelledby="tab-android" tabindex="0">
+            <div class="download card">
+              <div>
+                <h3>Levelex for Android</h3>
+                <p class="muted">Android 7.0 or newer · <span data-release-version>latest release</span></p>
+              </div>
+              <div class="download__actions">
+                <a class="btn btn--primary" data-asset="arm64" href="https://github.com/khjabir/levelex/releases/latest/download/levelex-android-arm64.apk">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+                  Download APK <span class="btn__note" data-asset-size="arm64"></span>
+                </a>
+                <p class="download__more">
+                  Older 32-bit phone? <a data-asset="armv7" href="https://github.com/khjabir/levelex/releases/latest/download/levelex-android-armv7.apk">32-bit APK</a> ·
+                  Not sure? <a data-asset="universal" href="https://github.com/khjabir/levelex/releases/latest/download/levelex-android-universal.apk">Universal APK</a> ·
+                  <a data-asset="sums" href="https://github.com/khjabir/levelex/releases/latest/download/SHA256SUMS.txt">Checksums</a>
+                </p>
+              </div>
+            </div>
+            <ol class="howto">
+              <li>
+                <h4>Download the APK on your phone</h4>
+                <p>Open this page on the phone and tap <em>Download APK</em>. Nearly every phone from the last eight
+                  years is 64-bit, so that is the right file. If Android later says the app can't be installed, use
+                  the universal APK instead.</p>
+              </li>
+              <li>
+                <h4>Allow the install</h4>
+                <p>Open the downloaded file. Android asks for permission to install apps from your browser or Files
+                  app: tap <em>Settings</em>, switch on <em>Allow from this source</em>, and go back. On Android 7,
+                  turn on <em>Settings → Security → Unknown sources</em> instead.</p>
+              </li>
+              <li>
+                <h4>Install</h4>
+                <p>Tap <em>Install</em>. Google Play Protect may warn that it doesn't recognise the app, because
+                  Levelex isn't on Google Play. Tap <em>More details → Install anyway</em>.</p>
+              </li>
+              <li>
+                <h4>Open Levelex</h4>
+                <p>Allow the camera when you start your first set, and notifications if you want reminders.</p>
+              </li>
+            </ol>
+            <div class="aside-grid">
+              <div class="card card--flat">
+                <h4>Updating</h4>
+                <p>Download the newer APK and install it over the top. Your history stays. Don't uninstall first:
+                  uninstalling deletes the app's data (export a backup in <em>Settings → Data &amp; backup</em> if you
+                  ever need to).</p>
+              </div>
+              <div class="card card--flat">
+                <h4>Checking the file</h4>
+                <p>Each release lists SHA-256 checksums. On a computer, compare them with
+                  <code>shasum -a 256 levelex-android-arm64.apk</code> (macOS, Linux) or
+                  <code>certutil -hashfile levelex-android-arm64.apk SHA256</code> (Windows).</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- iPhone -->
+          <div class="tabs__panel" role="tabpanel" id="install-ios" aria-labelledby="tab-ios" tabindex="0" hidden>
+            <p>Apple only lets App Store apps install directly, so on iPhone Levelex is signed with your own Apple ID,
+              the same way developers test their apps. A free Apple ID works. You need iOS 15.5 or newer and a
+              computer for the first install.</p>
+            <div class="options">
+              <div class="card">
+                <p class="option-label">Option A · no coding, Windows or Mac</p>
+                <h3>Sideload the app file</h3>
+                <ol class="howto howto--compact">
+                  <li><p>Download <a data-asset="ios" href="https://github.com/khjabir/levelex/releases/latest/download/levelex-ios-unsigned.ipa">levelex-ios-unsigned.ipa</a> <span class="muted" data-asset-size="ios"></span> on your computer.</p></li>
+                  <li><p>Install <a href="https://sideloadly.io">Sideloadly</a> or <a href="https://altstore.io">AltStore</a> on the computer and connect the iPhone with a cable.</p></li>
+                  <li><p>Open the IPA in the tool and sign in with your Apple ID. It signs the app for your phone and installs it.</p></li>
+                  <li><p>On the iPhone, open <em>Settings → General → VPN &amp; Device Management</em> and trust your Apple ID's developer app. On iOS 16 or newer, also turn on <em>Settings → Privacy &amp; Security → Developer Mode</em> and restart.</p></li>
+                </ol>
+              </div>
+              <div class="card">
+                <p class="option-label">Option B · a Mac with Xcode</p>
+                <h3>Build and run it yourself</h3>
+                <ol class="howto howto--compact">
+                  <li><p>Install Xcode, CocoaPods and Flutter 3.47, then get the code:</p>
+<pre data-copy><code>git clone https://github.com/khjabir/levelex.git
+cd levelex
+flutter pub get
+cd ios &amp;&amp; pod install &amp;&amp; cd ..</code></pre></li>
+                  <li><p>Open <code>ios/Runner.xcworkspace</code> in Xcode, choose your Apple ID as the Team under <em>Signing &amp; Capabilities</em>, connect the iPhone and run:</p>
+<pre data-copy><code>flutter run --release</code></pre></li>
+                  <li><p>Trust the developer app and turn on Developer Mode as in Option A.</p></li>
+                </ol>
+              </div>
+            </div>
+            <div class="card card--flat">
+              <h4>Keeping it working</h4>
+              <p>Apps signed with a free Apple ID stop opening after 7 days until they are refreshed. AltStore can
+                refresh over Wi-Fi while your computer is on; with Sideloadly or Xcode, install again. Your data stays
+                either way. A paid Apple Developer account extends this to a year.</p>
+            </div>
+          </div>
+
+          <!-- Source -->
+          <div class="tabs__panel" role="tabpanel" id="install-source" aria-labelledby="tab-source" tabindex="0" hidden>
+            <p>Levelex is a Flutter app. You need Flutter 3.47, plus JDK 17 and the Android SDK for Android, or a Mac
+              with Xcode for iPhone.</p>
+<pre data-copy><code>git clone https://github.com/khjabir/levelex.git
+cd levelex
+flutter pub get
+flutter run --release</code></pre>
+            <p>To build an installable Android file instead:</p>
+<pre data-copy><code>flutter build apk --release --split-per-abi</code></pre>
+            <p>Platform setup, signing and release builds are covered in
+              <a href="https://github.com/khjabir/levelex/blob/main/docs/BUILDING.md">docs/BUILDING.md</a>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section section--tint" id="faq">
+      <div class="wrap faq">
+        <p class="eyebrow">FAQ</p>
+        <h2>Questions</h2>
+        <details>
+          <summary>Why isn't Levelex on Google Play or the App Store?</summary>
+          <p>It isn't in the stores yet. For now it is distributed directly through its GitHub releases, which is
+            why this page has an install guide.</p>
+        </details>
+        <details>
+          <summary>Is it safe to install an app from outside Google Play?</summary>
+          <p>Only download Levelex from this site or the project's GitHub releases page, and compare the checksum
+            if you want to be sure the file is untouched. The app asks for the camera, and for notifications if you
+            want reminders. It doesn't send your data anywhere.</p>
+        </details>
+        <details>
+          <summary>Does it cost anything?</summary>
+          <p>No. There is no price, no subscription, no ads and no in-app purchases.</p>
+        </details>
+        <details>
+          <summary>Does it need an internet connection?</summary>
+          <p>No. Pose detection, the face check, the trainer and the 3D guides all run on the phone.</p>
+        </details>
+        <details>
+          <summary>Does it record video of me?</summary>
+          <p>No. Each camera frame is analysed in memory to find your body's position and then discarded.</p>
+        </details>
+        <details>
+          <summary>Why does it ask to register my face?</summary>
+          <p>So that only you can score your own sets and streak. The face is stored as numbers, not a photo, and
+            you can skip the check for any set (it is then saved as unverified and earns no XP).</p>
+        </details>
+        <details>
+          <summary>Which phones work?</summary>
+          <p>Android 7.0 or newer and iOS 15.5 or newer, with a working camera. Tracking is smoother on recent
+            phones; phones with little memory get a lighter 3D guide automatically.</p>
+        </details>
+        <details>
+          <summary>How accurate is the counting?</summary>
+          <p>Very good with your whole body in frame and the phone where the exercise suggests. Floor exercises
+            such as sit-ups and glute bridges count best filmed from the side or a diagonal, not from your head or
+            feet. If a set ever miscounts, the summary screen can copy a tracking report (numbers only) to share
+            on GitHub.</p>
+        </details>
+        <details>
+          <summary>How do I move my history to a new phone?</summary>
+          <p>In <em>Settings → Data &amp; backup</em>, export a backup and open it with Levelex on the new phone.
+            You can also import workout history from Strong, Hevy or FitNotes.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__inner">
+      <div class="footer__brand">
+        <a class="brand" href="#top"><img src="/assets/icon-512.png" alt="" width="28" height="28"><span>LEVELEX</span></a>
+        <p class="muted">Level up, one rep at a time.</p>
+      </div>
+      <nav class="footer__links" aria-label="Project">
+        <a href="https://github.com/khjabir/levelex">Source on GitHub</a>
+        <a href="https://github.com/khjabir/levelex/releases">Releases</a>
+        <a href="https://github.com/khjabir/levelex/issues">Report a problem</a>
+        <a href="#privacy">Privacy</a>
+      </nav>
+      <p class="footer__credits muted">3D body based on Blender Studio's Human Base Meshes (CC0). Face model:
+        MobileFaceNet (Apache 2.0). Font: Inter (SIL Open Font License). Android is a trademark of Google LLC;
+        iPhone and App Store are trademarks of Apple Inc. © <span data-year>2026</span> Levelex.</p>
+    </div>
+  </footer>
+</body>
+</html>
