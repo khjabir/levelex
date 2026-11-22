@@ -21,6 +21,7 @@ class WorkoutDraft {
     required this.targetReps,
     required this.reps,
     this.exercise = ExerciseType.pushUp,
+    this.verified = false,
   });
 
   final String id;
@@ -29,12 +30,17 @@ class WorkoutDraft {
   final int reps;
   final ExerciseType exercise;
 
+  /// Whether the face check passed for this set. Recovered sets keep it, so
+  /// a skipped or failed check never earns XP or a streak day after a crash.
+  final bool verified;
+
   Map<String, dynamic> toMap() => {
     'id': id,
     'startTime': startTime.millisecondsSinceEpoch,
     'targetReps': targetReps,
     'reps': reps,
     'exercise': exercise.id,
+    'verified': verified,
   };
 
   factory WorkoutDraft.fromMap(Map<String, dynamic> map) => WorkoutDraft(
@@ -43,6 +49,7 @@ class WorkoutDraft {
     targetReps: map['targetReps'] as int,
     reps: map['reps'] as int,
     exercise: ExerciseType.fromId(map['exercise'] as String?),
+    verified: map['verified'] as bool? ?? false,
   );
 }
 

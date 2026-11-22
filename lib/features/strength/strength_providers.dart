@@ -205,7 +205,10 @@ final activeRoutineIdProvider =
 final routineRunsProvider = Provider<List<RoutineRun>>(
   (ref) => [
     for (final r in ref.watch(ptRecordsProvider))
-      if (r.routineId != null && r.routineDayId != null)
+      // A session ended before any work does not use up the routine day.
+      if (r.routineId != null &&
+          r.routineDayId != null &&
+          r.items.any((i) => !i.skipped && i.setsDone > 0))
         (routineId: r.routineId!, dayId: r.routineDayId!, at: r.startTime),
   ],
 );
@@ -217,7 +220,9 @@ final todayRoutineDayProvider = Provider<RoutineDay?>((ref) {
   if (routine == null) return null;
   return RoutineScheduler.dayFor(
     routine,
-    DateTime.now(),
+    // The app clock (refreshed on resume and at midnight), so the day
+    // changes overnight instead of showing yesterday's routine day.
+    ref.watch(clockProvider),
     ref.watch(routineRunsProvider),
   );
 });

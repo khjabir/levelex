@@ -40,6 +40,7 @@ class AngleTracking extends TrackingSpec {
     required this.workAngle,
     this.requireUpright = false,
     this.aggregate = SideAggregate.mean,
+    this.minGap = 15,
   });
 
   final JointKind joint;
@@ -52,6 +53,9 @@ class AngleTracking extends TrackingSpec {
   /// How the two sides combine: mean for bilateral movements, min/max for
   /// alternating ones (high knees, mountain climbers).
   final SideAggregate aggregate;
+
+  /// Smallest distance kept between the rest and work thresholds (degrees).
+  final double minGap;
 
   bool get restIsHigh => restAngle > workAngle;
 }

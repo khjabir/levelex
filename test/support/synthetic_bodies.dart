@@ -20,28 +20,55 @@ class Body {
     return joints;
   }
 
-  /// Push-up body with elbow angle [elbowAngle] (degrees); hands planted
-  /// under the shoulders, elbows flaring sideways. [hipOffset] moves the hips
-  /// up (+) or down (−) in metres.
+  /// Push-up body with elbow angle [elbowAngle] (degrees), with real
+  /// mechanics: hands planted a little wider than the shoulders, shoulder
+  /// width constant, the shoulders lowering (and drifting slightly towards
+  /// the head) while the elbows bend back and out, placed by two-bone IK.
+  /// [hipOffset] moves the hips up (+) or down (−) in metres.
   factory Body.pushUp(double elbowAngle, {double hipOffset = 0}) {
-    const a = 0.3;
+    const upper = 0.30, fore = 0.28;
     final theta = elbowAngle * math.pi / 180;
-    final d = 2 * a * math.sin(theta / 2);
-    final e = math.sqrt(math.max(0, a * a - (d / 2) * (d / 2)));
-    const ankleY = 0.05;
-    final hipY = (d + ankleY) / 2 + hipOffset;
-    final kneeY = (d + 3 * ankleY) / 4 + hipOffset / 2;
-    final joints = _bilateral(
-      (s, sign) => {
-        s.shoulder: Vec3(0, d, 0.2 * sign),
-        s.elbow: Vec3(0, d / 2, (0.2 + e) * sign),
-        s.wrist: Vec3(0, 0, 0.2 * sign),
-        s.hip: Vec3(0.5, hipY, 0.15 * sign),
-        s.knee: Vec3(0.75, kneeY, 0.1 * sign),
-        s.ankle: Vec3(1.0, ankleY, 0.1 * sign),
-      },
+    // Shoulder–wrist distance for this elbow angle (law of cosines).
+    final reach = math.sqrt(
+      upper * upper + fore * fore - 2 * upper * fore * math.cos(theta),
     );
-    joints[LandmarkType.nose] = const Vec3(-0.15, 0.55, 0);
+    final bend = ((180 - elbowAngle) / 90).clamp(0.0, 1.0);
+    final forward = 0.06 * bend; // shoulders drift towards the head
+    const lateral = 0.06; // hands wider than the shoulders
+    final height = math.sqrt(
+      math.max(0, reach * reach - forward * forward - lateral * lateral),
+    );
+    const ankleY = 0.05;
+    final joints = _bilateral((s, sign) {
+      final wrist = Vec3(0, 0, 0.25 * sign);
+      final shoulder = Vec3(-forward, height, 0.19 * sign);
+      // Elbow on the circle around the shoulder–wrist line, pushed back
+      // (+x, towards the feet) and out.
+      final axis = wrist - shoulder;
+      final dist = axis.length;
+      final along = (upper * upper - fore * fore + dist * dist) / (2 * dist);
+      final radius = math.sqrt(math.max(0, upper * upper - along * along));
+      final unit = axis * (1 / dist);
+      final pole = Vec3(1, 0, 0.6 * sign);
+      final perp = pole - unit * pole.dot(unit);
+      final perpUnit = perp * (1 / perp.length);
+      final elbow = shoulder + unit * along + perpUnit * radius;
+      final hipY = (shoulder.y + ankleY) / 2 + hipOffset;
+      return {
+        s.shoulder: shoulder,
+        s.elbow: elbow,
+        s.wrist: wrist,
+        s.hip: Vec3(shoulder.x + 0.5, hipY, 0.15 * sign),
+        s.knee: Vec3(
+          shoulder.x + 0.75,
+          (hipY + ankleY) / 2 + hipOffset / 2,
+          0.1 * sign,
+        ),
+        s.ankle: Vec3(shoulder.x + 1.0, ankleY, 0.1 * sign),
+      };
+    });
+    final sh = joints[LandmarkType.leftShoulder]!;
+    joints[LandmarkType.nose] = Vec3(sh.x - 0.15, sh.y - 0.05, 0);
     return Body(joints);
   }
 

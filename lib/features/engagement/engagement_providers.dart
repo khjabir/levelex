@@ -125,6 +125,15 @@ final newAchievementsProvider = Provider<List<AchievementStatus>>((ref) {
   return Achievements.newlyEarned(ref.watch(achievementsProvider), seen);
 });
 
+/// The badges that were new when a result screen first showed them, kept
+/// for that screen (keyed by the session or record id) after they are
+/// marked seen; watching [newAchievementsProvider] directly made them
+/// vanish one frame after appearing.
+final newBadgesShownProvider = Provider.autoDispose
+    .family<List<AchievementStatus>, String>(
+      (ref, occasion) => ref.read(newAchievementsProvider),
+    );
+
 /// Marks every currently earned badge as seen.
 final markAchievementsSeenProvider = Provider<Future<void> Function()>((ref) {
   return () async {

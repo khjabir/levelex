@@ -55,6 +55,37 @@ abstract final class PlanAdvisor {
     );
   }
 
+  /// Holds and bodyweight reps progress by raising the target itself, and
+  /// the log stores what was done, not what was asked. Starting from the
+  /// plan's base target every time compared each session with the base, so
+  /// a 30 s plank went 30, 35, 35, 35… and push-ups 10, 11, 11, 11. Replays
+  /// the rule over the recent history to recover the target that was set
+  /// for the last session.
+  static ProgressionRule _replayTargets(
+    ProgressionRule rule,
+    List<LiftEntry> history,
+  ) {
+    if (history.length < 2) return rule;
+    final sorted = [...history]
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final from = sorted.length > 30 ? sorted.length - 30 : 0;
+    var current = rule;
+    for (var i = from + 1; i < sorted.length; i++) {
+      final p = ProgressionEngine.next(
+        rule: current,
+        history: sorted.sublist(from, i),
+      );
+      if (p.kind == PrescriptionKind.first || p.kind == PrescriptionKind.off) {
+        continue;
+      }
+      current = current.copyWith(
+        seconds: p.seconds ?? current.seconds,
+        repsMax: p.reps > 0 ? p.reps : current.repsMax,
+      );
+    }
+    return current;
+  }
+
   static PlanItem annotateItem(
     PlanItem item,
     PtRequest request,
@@ -68,7 +99,8 @@ abstract final class PlanAdvisor {
         if (e.movementId == m.id) e,
     ];
     if (history.isEmpty && !item.loaded) return item;
-    final rule = ruleFor(item, request, rules);
+    var rule = ruleFor(item, request, rules);
+    if (item.isTimed || !item.loaded) rule = _replayTargets(rule, history);
     final p = ProgressionEngine.next(rule: rule, history: history);
     if (p.kind == PrescriptionKind.first) {
       return item.loaded

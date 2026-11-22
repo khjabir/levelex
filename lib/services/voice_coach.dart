@@ -145,6 +145,14 @@ class VoiceCoach {
       await _tts.setPitch(1.0);
       await _tts.setVolume(1.0);
       await _tts.awaitSpeakCompletion(false);
+      try {
+        // Android flushes the queue by default, which cut off the line
+        // before the next one (e.g. the after-set feedback in MY PT). Cues
+        // that must interrupt stop the engine explicitly.
+        await _tts.setQueueMode(1);
+      } catch (_) {
+        // iOS queues by default and has no queue mode.
+      }
     } catch (e) {
       debugPrint('Voice coach unavailable: $e');
       _available = false;

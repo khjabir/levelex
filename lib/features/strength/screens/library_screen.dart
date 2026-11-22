@@ -159,7 +159,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
                     children: [
-                      if (custom.isNotEmpty) ...[
+                      // Imported exercises have no guide or tracking, so
+                      // routines and intervals cannot use them: picking one
+                      // used to be dropped silently (or leave a hidden
+                      // entry), so they are not offered when picking.
+                      if (custom.isNotEmpty && !widget.pickMode) ...[
                         const SectionHeader('Your exercises'),
                         for (final e in custom.values)
                           _CustomTile(

@@ -58,6 +58,16 @@ class _FaceRegistrationScreenState extends ConsumerState<FaceRegistrationScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _error != null &&
+        _permanentlyDenied) {
+      // Back from the settings app: if the camera was allowed there, start
+      // the scan instead of leaving "Open settings" as the only way out.
+      ref.read(permissionServiceProvider).cameraStatus().then((status) {
+        if (mounted && status == CameraPermissionResult.granted) _start();
+      });
+      return;
+    }
     if (state != AppLifecycleState.resumed && _step == _Step.capturing) {
       _camera.releaseCamera();
       if (mounted) {
@@ -268,6 +278,18 @@ class _Intro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Scrolls at large text sizes so the button never ends up off screen.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: IntrinsicHeight(child: _content(context, theme)),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(BuildContext context, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -298,6 +320,7 @@ class _Intro extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        const SizedBox(height: 16),
         if (!alreadyRegistered)
           PrimaryButton(
             label: 'START FACE SCAN',

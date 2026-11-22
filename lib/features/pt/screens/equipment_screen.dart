@@ -10,6 +10,7 @@ import '../../../widgets/primary_button.dart';
 import '../data/equipment_detector.dart';
 import '../../../widgets/app_card.dart';
 import '../../../widgets/section_header.dart';
+import '../../settings/widgets/settings_widgets.dart' show confirmAction;
 import '../models/equipment.dart';
 import '../pt_providers.dart';
 import 'pt_widgets.dart';
@@ -238,7 +239,28 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
         actions: [
           if (!profile.bodyweightOnly)
             TextButton(
-              onPressed: notifier.clear,
+              onPressed: () async {
+                // One tap used to wipe every item, location and photo.
+                final ok = await confirmAction(
+                  context,
+                  title: 'Switch to bodyweight only?',
+                  message:
+                      'This removes all your equipment, its locations and '
+                      'photos from MY PT.',
+                  confirmLabel: 'Remove all',
+                  destructive: true,
+                );
+                if (!ok) return;
+                for (final item in profile.items) {
+                  final path = item.photoPath;
+                  if (path == null) continue;
+                  try {
+                    final f = File(path);
+                    if (f.existsSync()) await f.delete();
+                  } catch (_) {}
+                }
+                await notifier.clear();
+              },
               child: const Text('Bodyweight only'),
             ),
         ],
@@ -299,7 +321,11 @@ class _EquipmentScreenState extends ConsumerState<EquipmentScreen> {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 10,
               crossAxisSpacing: 10,
-              childAspectRatio: 1.35,
+              // Taller tiles as the text grows (two-line names clipped at
+              // the largest sizes).
+              childAspectRatio:
+                  1.35 /
+                  MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.6),
               children: [
                 for (final type in Equipment.values)
                   _EquipmentTile(
@@ -368,6 +394,8 @@ class _EquipmentTile extends StatelessWidget {
       selected: selected,
       label: '${type.label}${selected ? ', available' : ''}',
       excludeSemantics: true,
+      onTap: onToggle,
+      onLongPress: selected ? onEdit : null,
       child: GestureDetector(
         onTap: onToggle,
         onLongPress: selected ? onEdit : null,
@@ -428,6 +456,7 @@ class _EquipmentTile extends StatelessWidget {
                     Text(
                       type.label,
                       maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: selected

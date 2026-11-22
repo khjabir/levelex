@@ -46,22 +46,41 @@ class _ChallengePlayScreenState extends ConsumerState<ChallengePlayScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
-    if (state != AppLifecycleState.resumed) {
-      ref.read(challengeControllerProvider.notifier).onAppBackgrounded();
+    final controller = ref.read(challengeControllerProvider.notifier);
+    switch (state) {
+      // `inactive` (a system dialog, the notification shade) keeps the app
+      // on screen; only a real move to the background ends the round.
+      case AppLifecycleState.paused ||
+          AppLifecycleState.hidden ||
+          AppLifecycleState.detached:
+        controller.onAppBackgrounded();
+      case AppLifecycleState.resumed:
+        controller.onAppResumed();
+      case AppLifecycleState.inactive:
+        break;
     }
   }
 
   Future<void> _confirmExit() async {
     final state = ref.read(challengeControllerProvider);
-    if (state.phase == RoundPhase.finished || state.scores.isEmpty) {
+    final live =
+        state.phase == RoundPhase.active ||
+        state.phase == RoundPhase.countdown ||
+        state.phase == RoundPhase.roundOver;
+    if (state.phase == RoundPhase.finished || (state.scores.isEmpty && !live)) {
       context.go(Routes.challenge);
       return;
     }
+    final controller = ref.read(challengeControllerProvider.notifier);
+    controller.holdRound();
     final leave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Leave the challenge?'),
-        content: const Text('Rounds played so far will be lost.'),
+        content: const Text(
+          'Rounds played so far will be lost. The clock is stopped while '
+          'you decide.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -74,7 +93,11 @@ class _ChallengePlayScreenState extends ConsumerState<ChallengePlayScreen>
         ],
       ),
     );
-    if (leave == true && mounted) context.go(Routes.challenge);
+    if (leave == true && mounted) {
+      context.go(Routes.challenge);
+    } else {
+      controller.releaseRound();
+    }
   }
 
   @override
@@ -201,46 +224,58 @@ class _UpNextView extends StatelessWidget {
       child: Column(
         children: [
           _Header(state: state, onExit: onExit),
-          const Spacer(),
-          PlayerAvatar(player: player, size: 132).animate().scale(
-            begin: const Offset(0.6, 0.6),
-            end: const Offset(1, 1),
-            duration: 500.ms,
-            curve: Curves.elasticOut,
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'UP NEXT',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: AppColors.primary,
-              letterSpacing: 3,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(player.name, style: theme.textTheme.displaySmall),
-          const SizedBox(height: 6),
-          Text(
-            state.config.describe,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 180,
-            child: Guide3D(clipId: state.config.exercise.clipId),
-          ),
-          if (state.scores.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              'To beat: ${state.scores.map((s) => s.reps).reduce((a, b) => a > b ? a : b)} '
-              '${state.config.exercise.countLabel(2)}',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: AppColors.warning,
+          // The middle scrolls when it does not fit (small phones, many
+          // players, large text) so the button below always stays on screen.
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PlayerAvatar(player: player, size: 132).animate().scale(
+                      begin: const Offset(0.6, 0.6),
+                      end: const Offset(1, 1),
+                      duration: 500.ms,
+                      curve: Curves.elasticOut,
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'UP NEXT',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: AppColors.primary,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(player.name, style: theme.textTheme.displaySmall),
+                    const SizedBox(height: 6),
+                    Text(
+                      state.config.describe,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: 180,
+                      child: Guide3D(clipId: state.config.exercise.clipId),
+                    ),
+                    if (state.scores.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'To beat: ${state.scores.map((s) => s.reps).reduce((a, b) => a > b ? a : b)} '
+                        '${state.config.exercise.countLabel(2)}',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: AppColors.warning,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ],
-          const Spacer(),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: PrimaryButton(
@@ -555,48 +590,65 @@ class _RoundOverView extends StatelessWidget {
       child: Column(
         children: [
           _Header(state: state, onExit: onExit),
-          const Spacer(),
-          PlayerAvatar(player: score.player, size: 96),
-          const SizedBox(height: 12),
-          Text(score.player.name, style: theme.textTheme.headlineSmall),
-          const SizedBox(height: 4),
-          Text(
-            '${score.reps}',
-            style: theme.textTheme.displayLarge?.copyWith(fontSize: 96),
-          ).animate().scale(
-            begin: const Offset(0.5, 0.5),
-            end: const Offset(1, 1),
-            duration: 500.ms,
-            curve: Curves.elasticOut,
-          ),
-          Text(
-            state.config.exercise.countLabel(score.reps) +
-                (state.timed
-                    ? ''
-                    : ' in ${score.seconds.toStringAsFixed(1)} s'),
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: AppCard(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(
-                children: [
-                  for (var i = 0; i < ranked.length; i++)
-                    _RankRow(
-                      index: i,
-                      score: ranked[i],
-                      exercise: state.config.exercise,
-                      timed: state.timed,
+          // The middle scrolls when it does not fit (small phones, many
+          // players, large text) so the button below always stays on screen.
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PlayerAvatar(player: score.player, size: 96),
+                    const SizedBox(height: 12),
+                    Text(
+                      score.player.name,
+                      style: theme.textTheme.headlineSmall,
                     ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      '${score.reps}',
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        fontSize: 96,
+                      ),
+                    ).animate().scale(
+                      begin: const Offset(0.5, 0.5),
+                      end: const Offset(1, 1),
+                      duration: 500.ms,
+                      curve: Curves.elasticOut,
+                    ),
+                    Text(
+                      state.config.exercise.countLabel(score.reps) +
+                          (state.timed
+                              ? ''
+                              : ' in ${score.seconds.toStringAsFixed(1)} s'),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: AppCard(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < ranked.length; i++)
+                              _RankRow(
+                                index: i,
+                                score: ranked[i],
+                                exercise: state.config.exercise,
+                                timed: state.timed,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          const Spacer(),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
             child: PrimaryButton(

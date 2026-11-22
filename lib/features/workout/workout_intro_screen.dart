@@ -89,8 +89,11 @@ class WorkoutIntroScreen extends ConsumerWidget {
         leading: IconButton(
           tooltip: 'Close',
           icon: const Icon(Icons.close),
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go(Routes.home),
+          onPressed: () {
+            // Closing the intro abandons a challenge or "beat it" launch.
+            ref.read(workoutLaunchProvider.notifier).clear();
+            context.canPop() ? context.pop() : context.go(Routes.home);
+          },
         ),
       ),
       body: SafeArea(
@@ -145,14 +148,20 @@ class WorkoutIntroScreen extends ConsumerWidget {
                                         color: AppColors.primary,
                                       ),
                                       const SizedBox(width: 6),
-                                      Text(
-                                        '${launch?.reason != null ? '${launch!.reason}: ' : 'Target: '}'
-                                        '${exercise.describeTarget(target)}',
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                              color: AppColors.primary,
-                                              fontWeight: FontWeight.w800,
-                                            ),
+                                      // Long labels ("Daily challenge: 45
+                                      // seconds of wall sit") wrap instead of
+                                      // overflowing on narrow phones.
+                                      Flexible(
+                                        child: Text(
+                                          '${launch?.reason != null ? '${launch!.reason}: ' : 'Target: '}'
+                                          '${exercise.describeTarget(target)}',
+                                          textAlign: TextAlign.center,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                        ),
                                       ),
                                     ],
                                   ),

@@ -297,6 +297,7 @@ class NotificationService {
     DateTime? today,
     DateTime? tomorrow,
     required int streak,
+    int? tomorrowStreak,
   }) async {
     if (!_initialized) return;
     await cancelStreakNudge();
@@ -305,16 +306,19 @@ class NotificationService {
     final mode = exact
         ? AndroidScheduleMode.exactAllowWhileIdle
         : AndroidScheduleMode.inexactAllowWhileIdle;
-    final body = streak > 0
+    String bodyFor(int days) => days > 0
         ? 'Nothing logged yet today. One quick set keeps your '
-              '$streak-day streak alive.'
+              '$days-day streak alive.'
         : 'Nothing logged yet today. A quick set now starts a streak.';
     final slots = [
-      (NotificationConstants.nudgeIdToday, today),
-      (NotificationConstants.nudgeIdTomorrow, tomorrow),
+      (NotificationConstants.nudgeIdToday, today, streak),
+      // Tomorrow's streak is only today's if today is done (or a rest day):
+      // otherwise it will have broken by the time the nudge fires.
+      (NotificationConstants.nudgeIdTomorrow, tomorrow, tomorrowStreak ?? 0),
     ];
-    for (final (id, at) in slots) {
+    for (final (id, at, days) in slots) {
       if (at == null) continue;
+      final body = bodyFor(days);
       try {
         await _plugin.zonedSchedule(
           id: id,

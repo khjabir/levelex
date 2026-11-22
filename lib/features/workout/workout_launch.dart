@@ -25,16 +25,29 @@ class WorkoutLaunch {
 }
 
 class WorkoutLaunchNotifier extends Notifier<WorkoutLaunch?> {
+  DateTime? _setAt;
+
+  /// A launch the user walked away from (closed the intro, went back) must
+  /// not hijack a later, ordinary set.
+  static const maxAge = Duration(minutes: 10);
+
   @override
   WorkoutLaunch? build() => null;
 
-  void set(WorkoutLaunch? launch) => state = launch;
+  void set(WorkoutLaunch? launch) {
+    _setAt = launch == null ? null : DateTime.now();
+    state = launch;
+  }
 
-  /// Returns the pending launch and clears it.
+  void clear() => set(null);
+
+  /// Returns the pending launch and clears it (nothing when it is stale).
   WorkoutLaunch? consume() {
     final l = state;
-    state = null;
-    return l;
+    final at = _setAt;
+    set(null);
+    if (l == null || at == null) return null;
+    return DateTime.now().difference(at) > maxAge ? null : l;
   }
 }
 

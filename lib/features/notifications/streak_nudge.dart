@@ -36,16 +36,20 @@ class StreakNudge {
         return at.isAfter(now) ? at : null;
       }
 
+      final streak = StatsCalculator.currentStreak(
+        sessions,
+        now,
+        ptRecords: pt,
+        restWeekdays: settings.restWeekdays,
+      );
+      final todaySafe =
+          done.contains(today) || settings.restWeekdays.contains(today.weekday);
       await service.scheduleStreakNudge(
         settings,
         today: slot(today),
         tomorrow: slot(tomorrow),
-        streak: StatsCalculator.currentStreak(
-          sessions,
-          now,
-          ptRecords: pt,
-          restWeekdays: settings.restWeekdays,
-        ),
+        streak: streak,
+        tomorrowStreak: todaySafe ? streak : 0,
       );
     } catch (e) {
       debugPrint('Streak nudge sync failed: $e');

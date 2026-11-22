@@ -82,16 +82,34 @@ class FaceService {
         minFaceSize: 0.1,
       ),
     );
-    if (_interpreter == null) {
+    if (_interpreter == null || _isolate == null) {
       final model = await rootBundle.load(FaceConstants.modelAsset);
+      if (_disposed) return;
       final interpreter = Interpreter.fromBuffer(model.buffer.asUint8List());
-      final input = interpreter.getInputTensor(0).shape;
-      final output = interpreter.getOutputTensor(0).shape;
-      _inputSize = input.length >= 3 ? input[1] : FaceCropper.outputSize;
-      _embeddingSize = output.last;
-      debugPrint('Face model loaded: input $input, output $output');
-      _interpreter = interpreter;
-      _isolate = await IsolateInterpreter.create(address: interpreter.address);
+      try {
+        final input = interpreter.getInputTensor(0).shape;
+        final output = interpreter.getOutputTensor(0).shape;
+        _inputSize = input.length >= 3 ? input[1] : FaceCropper.outputSize;
+        _embeddingSize = output.last;
+        debugPrint('Face model loaded: input $input, output $output');
+        final isolate = await IsolateInterpreter.create(
+          address: interpreter.address,
+        );
+        if (_disposed) {
+          // Disposed while loading: nothing may outlive the service.
+          await isolate.close();
+          interpreter.close();
+          return;
+        }
+        _interpreter?.close();
+        _interpreter = interpreter;
+        _isolate = isolate;
+      } catch (e) {
+        // Leave nothing half-built, so the next attempt starts clean instead
+        // of reporting "ready" checks forever false.
+        interpreter.close();
+        rethrow;
+      }
     }
   }
 

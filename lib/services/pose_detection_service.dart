@@ -173,11 +173,22 @@ class PoseDetectionService {
     };
   }
 
-  /// Opens the camera. Throws [PoseDetectionException] on failure.
-  Future<void> initialize() async {
-    if (_disposed) throw StateError('PoseDetectionService was disposed');
-    if (isInitialized) return;
+  /// In-flight [initialize], so overlapping calls share it and a release
+  /// that arrives meanwhile waits for it instead of missing the camera.
+  Future<void>? _initializing;
 
+  /// Opens the camera. Throws [PoseDetectionException] on failure.
+  Future<void> initialize() {
+    if (_disposed) {
+      return Future.error(StateError('PoseDetectionService was disposed'));
+    }
+    if (isInitialized) return Future.value();
+    return _initializing ??= _initialize().whenComplete(
+      () => _initializing = null,
+    );
+  }
+
+  Future<void> _initialize() async {
     List<CameraDescription> cameras;
     try {
       cameras = await availableCameras();
@@ -281,6 +292,14 @@ class PoseDetectionService {
   /// Releases the camera (e.g. when the app goes to background) while keeping
   /// the detector so [initialize] can resume quickly.
   Future<void> releaseCamera() async {
+    final pending = _initializing;
+    if (pending != null) {
+      // Opening right now (e.g. the app was backgrounded while returning):
+      // let it finish, then release what it opened.
+      try {
+        await pending;
+      } catch (_) {}
+    }
     await stopStream();
     await _accelSubscription?.cancel();
     _accelSubscription = null;

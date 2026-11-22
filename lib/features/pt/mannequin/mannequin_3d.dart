@@ -118,12 +118,17 @@ class _Mannequin3DState extends State<Mannequin3D>
         final yaw = widget.autoRotate && idleFor > 2500
             ? _yaw + math.sin(now / 4200) * 22
             : _yaw;
-        var pose = _clip.at(widget.playing ? ms : 0);
+        final at = widget.playing ? ms : 0;
+        var pose = _clip.at(at);
+        var offset = _clip.offsetAt(at);
         final sinceSwitch = now - _switchMs;
         if (_fromClip != null && sinceSwitch < Mannequin3D.crossFadeMs) {
           final u = (sinceSwitch / Mannequin3D.crossFadeMs).clamp(0.0, 1.0);
-          final from = _fromClip!.at(math.max(0, now - _fromEpoch));
-          pose = RigPose.lerp(from, pose, u * u * (3 - 2 * u));
+          final k = u * u * (3 - 2 * u);
+          final fromMs = math.max(0, now - _fromEpoch);
+          pose = RigPose.lerp(_fromClip!.at(fromMs), pose, k);
+          final fromOffset = _fromClip!.offsetAt(fromMs);
+          offset = fromOffset + (offset - fromOffset) * k;
         }
         return CustomPaint(
           painter: MannequinPainter(
@@ -135,6 +140,7 @@ class _Mannequin3DState extends State<Mannequin3D>
             showFloor: widget.showFloor,
             compact: widget.compact,
             frame: _frame,
+            offset: offset,
           ),
           child: const SizedBox.expand(),
         );

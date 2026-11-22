@@ -315,27 +315,32 @@ class _WeekdayCell extends StatelessWidget {
             color: day == null ? AppColors.outline : AppColors.primary,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              DateFormat.E().format(DateTime(2024, 1, weekday)).substring(0, 2),
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: AppColors.textMuted,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                DateFormat.E()
+                    .format(DateTime(2024, 1, weekday))
+                    .substring(0, 2),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: AppColors.textMuted,
+                ),
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              day == null ? 'Rest' : _short(day.name),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: day == null ? AppColors.textMuted : AppColors.primary,
-                fontWeight: FontWeight.w800,
-                fontSize: 10,
+              const SizedBox(height: 2),
+              Text(
+                day == null ? 'Rest' : _short(day.name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: day == null ? AppColors.textMuted : AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 10,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

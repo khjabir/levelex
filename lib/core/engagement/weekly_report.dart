@@ -123,7 +123,8 @@ abstract final class WeeklyReports {
 
     var prs = 0;
     for (final pr in RecordBook.recent(lifts, limit: 1000)) {
-      if (inWeek(pr.date)) prs++;
+      // A first log is a baseline, not a record beaten.
+      if (pr.previous != null && inWeek(pr.date)) prs++;
     }
 
     return WeeklyReport(

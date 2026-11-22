@@ -368,35 +368,39 @@ class _Legend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Scales down instead of overflowing at large text sizes.
     return SizedBox(
       height: MuscleMap.legendHeight - 8,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (final state in MuscleState.values) ...[
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: MuscleMap.colorFor(state),
-                borderRadius: BorderRadius.circular(3),
-                border: state == MuscleState.fresh
-                    ? Border.all(color: AppColors.outline)
-                    : null,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (final state in MuscleState.values) ...[
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: MuscleMap.colorFor(state),
+                  borderRadius: BorderRadius.circular(3),
+                  border: state == MuscleState.fresh
+                      ? Border.all(color: AppColors.outline)
+                      : null,
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              state.label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+              const SizedBox(width: 6),
+              Text(
+                state.label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
-            if (state != MuscleState.values.last) const SizedBox(width: 16),
+              if (state != MuscleState.values.last) const SizedBox(width: 16),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

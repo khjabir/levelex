@@ -52,6 +52,9 @@ abstract final class LiftImporter {
     if (table.isEmpty) return const ImportResult(source: ImportSource.generic);
     final source = detect(table.normalizedHeaders);
     final cols = _Columns(table);
+    // One file uses one date order. Deciding per row read MM/dd files as
+    // dd/MM on every day 1-12 (03/04 became 3 April, 03/15 15 March).
+    _dayFirst = _numericOrder(table, cols);
     if (cols.exercise == null && cols.date != null && cols.bodyWeight != null) {
       return _parseBodyWeights(table, cols);
     }
@@ -275,7 +278,7 @@ abstract final class LiftImporter {
   /// `yyyy-MM-dd[ HH:mm[:ss]]`, ISO 8601 (T, Z or an offset → converted to
   /// local), Hevy's `5 Jan 2024, 18:30`, `Jan 5, 2024`, `dd/MM/yyyy` and
   /// `MM/dd/yyyy` (by value; `dd/MM` when both fit), `yyyy/MM/dd`.
-  static DateTime? parseDateTime(String? raw) {
+  static DateTime? parseDateTime(String? raw, {bool? dayFirst}) {
     if (raw == null) return null;
     final s = raw.trim().toLowerCase();
     if (s.isEmpty) return null;
@@ -299,9 +302,13 @@ abstract final class LiftImporter {
     if (m != null) {
       final a = int.parse(m.group(1)!);
       final b = int.parse(m.group(2)!);
-      final dayFirst = a > 12 || b <= 12;
-      final day = dayFirst ? a : b;
-      final month = dayFirst ? b : a;
+      final order = a > 12
+          ? true
+          : b > 12
+          ? false
+          : (dayFirst ?? _dayFirst ?? true);
+      final day = order ? a : b;
+      final month = order ? b : a;
       return _build(m.group(3), month, '$day', m, 4);
     }
     m = _yearFirstDate.firstMatch(s);
@@ -309,6 +316,28 @@ abstract final class LiftImporter {
       return _build(m.group(1), int.parse(m.group(2)!), m.group(3), m, 4);
     }
     return null;
+  }
+
+  /// The numeric date order of the file being parsed (null: unknown, so
+  /// day-first), set by [parseCsv].
+  static bool? _dayFirst;
+
+  /// Day-first (true) or month-first (false) from any date in the file
+  /// whose first or second number is above 12; null when none decides.
+  static bool? _numericOrder(CsvTable table, _Columns cols) {
+    var dayFirst = 0, monthFirst = 0;
+    for (final row in table.rows) {
+      for (final c in [cols.date, cols.startTime]) {
+        final raw = table.value(row, c)?.trim().toLowerCase();
+        if (raw == null) continue;
+        final m = _numericDate.firstMatch(raw);
+        if (m == null) continue;
+        if (int.parse(m.group(1)!) > 12) dayFirst++;
+        if (int.parse(m.group(2)!) > 12) monthFirst++;
+      }
+    }
+    if (dayFirst == monthFirst) return null;
+    return dayFirst > monthFirst;
   }
 
   /// Seconds from `h:mm:ss`, `mm:ss`, `45s`, `1m 30s`, `1h 5m` or a plain

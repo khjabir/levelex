@@ -24,7 +24,12 @@ void main() {
       expect(squat.totalMs, down + up);
       expect(up, lessThan(down));
       expect(squat.framePosition(down + up ~/ 2), closeTo(0.5, 0.02));
-      expect(circles.framePosition(circles.totalMs - 1), closeTo(0.0, 0.05));
+      // A loop closes on the copy of the first keyframe after the last one
+      // (position frames.length), never sweeping back through the others.
+      expect(
+        circles.framePosition(circles.totalMs - 1),
+        closeTo(circles.frames.length.toDouble(), 0.05),
+      );
     });
   });
 

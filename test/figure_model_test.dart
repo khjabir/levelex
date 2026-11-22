@@ -232,7 +232,9 @@ void main() {
             : top[v * 3 + 1];
         if (y >= lo - 0.03 && y <= hi + 0.03) between++;
       }
-      expect(between, greaterThan((model.vertexCount ~/ 25) * 0.9));
+      // A full-depth push-up swings the elbows up and out mid-rep, so a
+      // fifth of the vertices may leave the band on their arcs.
+      expect(between, greaterThan((model.vertexCount ~/ 25) * 0.8));
     });
   });
 }

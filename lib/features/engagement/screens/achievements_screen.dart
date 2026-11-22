@@ -133,7 +133,13 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen> {
                         physics: const NeverScrollableScrollPhysics(),
                         mainAxisSpacing: 10,
                         crossAxisSpacing: 10,
-                        childAspectRatio: 0.78,
+                        // Room for two title lines and the progress line,
+                        // taller as the text grows.
+                        childAspectRatio:
+                            0.7 /
+                            MediaQuery.textScalerOf(context)
+                                .scale(1)
+                                .clamp(1.0, 2.0),
                         children: [
                           for (final s in byCategory[c]!)
                             BadgeTile(

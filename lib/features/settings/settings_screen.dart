@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +20,7 @@ import '../notifications/streak_nudge.dart';
 import '../challenge/challenge_providers.dart';
 import '../pt/pt_providers.dart';
 import '../strength/data/backup_actions.dart';
+import '../strength/strength_providers.dart';
 import '../workout/exercise_icons.dart';
 import '../workout/workout_intro_screen.dart';
 import 'widgets/settings_widgets.dart';
@@ -48,6 +51,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// Applies a settings change and keeps the OS reminder schedule in sync.
   Future<void> _update(UserSettings Function(UserSettings) change) async {
     final before = ref.read(settingsProvider);
+    if (ReminderController.affectsSchedule(before, change(before)) ||
+        before.trackSkippedSessions != change(before).trackSkippedSessions) {
+      // Settle missed reminders under the rules that were in force, so the
+      // new schedule only applies from now (turning reminders on at 11:30
+      // must not record 09:00-11:00 as skipped).
+      await ref.read(sessionsProvider.notifier).evaluateSkipped();
+    }
     await ref.read(settingsProvider.notifier).updateSettings(change);
     final after = ref.read(settingsProvider);
     if (ReminderController.affectsSchedule(before, after)) {
@@ -182,7 +192,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(ptRecordsProvider.notifier).clear();
     await ref.read(gymProfileProvider.notifier).clear();
     await ref.read(challengeRecordsProvider.notifier).clear();
+    // "Everything" includes lifts, weigh-ins, progress photos, routines and
+    // the challenge players, which used to survive a reset.
+    final strength = ref.read(strengthRepositoryProvider);
+    for (final photo in strength.photos()) {
+      try {
+        final file = File(photo.path);
+        if (file.existsSync()) await file.delete();
+      } catch (_) {
+        // A photo that cannot be deleted is left behind; the record goes.
+      }
+    }
+    await strength.clear();
+    await ref.read(challengeRepositoryProvider).savePlayers(const []);
     await ref.read(settingsProvider.notifier).reset();
+    // The face template lived in the settings store just wiped; without a
+    // rebuild the app still believed a face was registered.
+    for (final provider in [
+      faceTemplateProvider,
+      liftLogProvider,
+      bodyWeightProvider,
+      bodyGoalProvider,
+      progressPhotosProvider,
+      routinesProvider,
+      activeRoutineIdProvider,
+      progressionRulesProvider,
+      challengeConfigProvider,
+    ]) {
+      ref.invalidate(provider);
+    }
     if (!mounted) return;
     context.go(Routes.onboarding);
   }
@@ -404,21 +442,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       'Daily goal: ${ref.watch(dailyGoalProvider)} '
                       '${settings.reminderExercise.countLabel(2)}',
                     ),
-                    trailing: DropdownButton<ExerciseType>(
-                      value: settings.reminderExercise,
-                      underline: const SizedBox.shrink(),
-                      items: [
-                        for (final type in ExerciseType.values)
-                          DropdownMenuItem(
-                            value: type,
-                            child: Text(type.label),
-                          ),
-                      ],
-                      onChanged: (type) {
-                        if (type != null) {
-                          _update((s) => s.copyWith(reminderExercise: type));
-                        }
-                      },
+                    // Capped width: at large text sizes the dropdown took
+                    // the whole tile and the list failed to lay out.
+                    trailing: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width * 0.42,
+                      ),
+                      child: DropdownButton<ExerciseType>(
+                        value: settings.reminderExercise,
+                        isExpanded: true,
+                        underline: const SizedBox.shrink(),
+                        items: [
+                          for (final type in ExerciseType.values)
+                            DropdownMenuItem(
+                              value: type,
+                              child: Text(
+                                type.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (type) {
+                          if (type != null) {
+                            _update((s) => s.copyWith(reminderExercise: type));
+                          }
+                        },
+                      ),
                     ),
                   ),
                   const Divider(indent: 20, endIndent: 20),

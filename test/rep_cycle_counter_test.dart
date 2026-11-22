@@ -153,7 +153,8 @@ void main() {
       final u = f.feed(170);
       expect(u.rejection, CycleRejection.cooldown);
       expect(c.repCount, 1);
-      f.now = f.now.add(const Duration(seconds: 2));
+      // Two seconds at rest (frames keep coming, as from a camera).
+      f.hold(170, 20);
       f.feed(80);
       f.feed(170);
       expect(c.repCount, 2);

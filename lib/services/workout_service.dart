@@ -74,6 +74,9 @@ class WorkoutService {
     if (draft == null) return null;
     await settings.saveDraft(null);
     if (draft.reps <= 0) return null;
+    // The set was saved but the app died before the draft was cleared:
+    // never overwrite the real session with the cruder draft.
+    if (sessions.all().any((s) => s.id == draft.id)) return null;
     return recordWorkout(
       id: draft.id,
       startTime: draft.startTime,
@@ -81,6 +84,7 @@ class WorkoutService {
       reps: draft.reps,
       endTime: draft.startTime.add(const Duration(minutes: 5)),
       exercise: draft.exercise,
+      verified: draft.verified,
     );
   }
 

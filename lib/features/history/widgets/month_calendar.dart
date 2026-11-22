@@ -345,6 +345,7 @@ class _DayCell extends StatelessWidget {
       ),
       button: tappable,
       excludeSemantics: true,
+      onTap: tappable ? () => onTap!(day) : null,
       child: SizedBox(width: size, height: size, child: box),
     );
   }

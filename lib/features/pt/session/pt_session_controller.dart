@@ -237,6 +237,7 @@ class PtSessionController extends Notifier<PtSessionState> {
 
   @override
   PtSessionState build() {
+    _voice = ref.read(voiceCoachProvider);
     ref.onDispose(_teardown);
     final plan = ref.read(annotatedPlanProvider);
     if (plan == null || plan.all.isEmpty) {
@@ -266,7 +267,20 @@ class PtSessionController extends Notifier<PtSessionState> {
     );
   }
 
-  VoiceCoach get _voice => ref.read(voiceCoachProvider);
+  /// Read once in [build]: `ref` throws inside `onDispose`, which used to
+  /// stop the teardown before the camera and detectors were released.
+  late VoiceCoach _voice;
+
+  /// The current item's result is already in `results` (its last set
+  /// finished and the session is closing), so [finish] must not add it a
+  /// second time as a partial item.
+  bool _currentItemRecorded = false;
+  bool _finishing = false;
+  bool _switchingCamera = false;
+
+  /// Time left on the identity check when the session was paused.
+  Duration? _verifyRemaining;
+  DateTime? _verifyDeadline;
 
   void _say(String text) {
     final settings = ref.read(settingsProvider);
@@ -583,6 +597,7 @@ class PtSessionController extends Notifier<PtSessionState> {
     final results = [...state.results, result];
     if (state.isLast) {
       state = state.copyWith(results: results);
+      _currentItemRecorded = true;
       unawaited(finish());
       return;
     }
@@ -668,6 +683,12 @@ class PtSessionController extends Notifier<PtSessionState> {
     if (state.paused || state.step == PtStep.finished) return;
     final base = _elapsedBase;
     if (base != null) _elapsedBefore += DateTime.now().difference(base);
+    // No frames arrive while paused, so the identity check's clock stops.
+    final deadline = _verifyDeadline;
+    if (_verifyTimer?.isActive ?? false) {
+      _verifyTimer?.cancel();
+      _verifyRemaining = deadline?.difference(DateTime.now());
+    }
     state = state.copyWith(paused: true, coachLine: 'Paused.');
     _sayCue(VoiceCue.paused);
     await _camera?.stopStream();
@@ -677,6 +698,15 @@ class PtSessionController extends Notifier<PtSessionState> {
     if (!state.paused) return;
     _elapsedBase = DateTime.now();
     state = state.copyWith(paused: false, coachLine: 'Back in. Keep going.');
+    final remaining = _verifyRemaining;
+    _verifyRemaining = null;
+    if (remaining != null && !state.verificationDone) {
+      _armVerifyTimer(
+        remaining < const Duration(seconds: 4)
+            ? const Duration(seconds: 4)
+            : remaining,
+      );
+    }
     if (state.step == PtStep.active && state.camera != PtCameraPhase.error) {
       if (_cameraReleasedByLifecycle || !(_camera?.isInitialized ?? false)) {
         await _openCamera();
@@ -688,13 +718,14 @@ class PtSessionController extends Notifier<PtSessionState> {
 
   /// Ends the session now, saving whatever was done.
   Future<void> finish() async {
-    if (state.step == PtStep.finished) return;
+    if (_finishing || state.step == PtStep.finished) return;
+    _finishing = true;
     _setTimer?.cancel();
     _restTimer?.cancel();
     _verifyTimer?.cancel();
     final results = [...state.results];
     final item = state.items.isEmpty ? null : state.item;
-    if (item != null && state.step != PtStep.intro) {
+    if (item != null && state.step != PtStep.intro && !_currentItemRecorded) {
       // Partial current item. During rest the last set is already in the
       // item totals; mid-set, add what this set has so far.
       final inSet = state.step == PtStep.active;
@@ -893,22 +924,31 @@ class PtSessionController extends Notifier<PtSessionState> {
       clearPose: true,
       coachLine: 'Camera is unavailable; log this set by hand.',
     );
+    // A camera that reported an error still claims to be initialised;
+    // release it so the next set opens a fresh one.
+    unawaited(_camera?.releaseCamera());
   }
 
   void _onCameraError(PoseDetectionException e) => _cameraFailed(e);
 
   Future<void> switchCamera() async {
     final c = _camera;
-    if (c == null || !state.cameraReady) return;
+    if (c == null || !state.cameraReady || _switchingCamera) return;
+    _switchingCamera = true;
+    state = state.copyWith(cameraReady: false, clearPose: true);
     try {
       await c.switchCamera();
+      if (_disposed) return;
       c.onFrame = _onFrame;
       state = state.copyWith(
+        cameraReady: true,
         mirror: c.mirrorPreview,
         lensDirection: c.lensDirection,
       );
     } on PoseDetectionException catch (e) {
       _cameraFailed(e);
+    } finally {
+      _switchingCamera = false;
     }
   }
 
@@ -933,9 +973,14 @@ class PtSessionController extends Notifier<PtSessionState> {
         debugPrint('Face model failed: $e');
       }),
     );
+    _armVerifyTimer(const Duration(seconds: 12));
+  }
+
+  void _armVerifyTimer(Duration after) {
     _verifyTimer?.cancel();
-    _verifyTimer = Timer(const Duration(seconds: 12), () {
-      if (state.verificationDone) return;
+    _verifyDeadline = DateTime.now().add(after);
+    _verifyTimer = Timer(after, () {
+      if (_disposed || state.verificationDone) return;
       state = state.copyWith(
         verificationDone: true,
         verified: false,

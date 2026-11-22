@@ -172,14 +172,12 @@ class PoseResult {
   /// points at the camera.
   static const _foreshortenedBelow = 0.6;
 
-  /// A depth-inclusive angle this much smaller than the planar one means
-  /// the bend happens towards the camera and the planar angle is blind to it.
-  static const _depthBendMargin = 25.0;
-
-  /// Angle at [b] formed by [a]→[b]→[c]. Uses the reliable image-plane angle
-  /// unless the limb is strongly foreshortened or bends mostly in depth, in
-  /// which case the depth-inclusive angle is used. `null` if a joint is
-  /// missing.
+  /// Angle at [b] formed by [a]→[b]→[c]. Uses the image-plane angle unless
+  /// the limb is strongly foreshortened (pointing at the camera), in which
+  /// case the depth-inclusive angle is used. ML Kit's depth is a rough
+  /// estimate (tens of pixels of noise), so it is never preferred merely
+  /// because it disagrees with the planar angle: that turned a straight arm
+  /// seen from the side into a 140° "bend". `null` if a joint is missing.
   double? jointAngle(LandmarkType a, LandmarkType b, LandmarkType c) {
     final pa = _pos(a);
     final pb = _pos(b);
@@ -193,7 +191,6 @@ class PoseResult {
     final len3 = Geometry.distance3(pa, pb) + Geometry.distance3(pb, pc);
     final len2 = Geometry.distance3(a2, b2) + Geometry.distance3(b2, c2);
     if (len3 > 0 && len2 / len3 < _foreshortenedBelow) return spatial;
-    if (spatial < planar - _depthBendMargin) return spatial;
     return planar;
   }
 
@@ -217,12 +214,48 @@ class PoseResult {
     return jointAngle(side.shoulder, side.hip, ankle);
   }
 
-  /// Signed height of [a] above [b] along [up], as a fraction of [scale].
+  /// "Up" projected onto the image plane and normalised. ML Kit's depth is
+  /// too noisy to measure heights with, so heights are taken in the image
+  /// plane; a camera tilted by a few degrees barely changes the projection.
+  Vec3 get up2D {
+    final u = up;
+    final flat = Vec3(u.x, u.y, 0);
+    return flat.length < 1e-6 ? const Vec3(0, -1, 0) : flat.normalized;
+  }
+
+  /// Height of the mean of [top] above the mean of [base] along [up2D], in
+  /// uniform image units, using only landmarks at or above [minConfidence].
+  /// `null` when either group has no such landmark.
+  double? heightBetween(
+    Iterable<LandmarkType> top,
+    Iterable<LandmarkType> base, {
+    double minConfidence = 0,
+  }) {
+    Vec3? mean(Iterable<LandmarkType> types) {
+      var sum = Vec3.zero;
+      var n = 0;
+      for (final t in types) {
+        final l = landmarks[t];
+        if (l == null || l.likelihood < minConfidence) continue;
+        sum = sum + Vec3(l.position.x, l.position.y, 0);
+        n++;
+      }
+      return n == 0 ? null : sum * (1 / n);
+    }
+
+    final a = mean(top);
+    final b = mean(base);
+    if (a == null || b == null) return null;
+    return (a - b).dot(up2D);
+  }
+
+  /// Signed height of [a] above [b] along [up2D] (image plane, depth is too
+  /// noisy), as a fraction of [scale].
   double? heightAbove(LandmarkType a, LandmarkType b, double scale) {
-    final pa = _pos(a);
-    final pb = _pos(b);
+    final pa = position2D(a);
+    final pb = position2D(b);
     if (pa == null || pb == null || scale == 0) return null;
-    return (pa - pb).dot(up) / scale;
+    return (pa - pb).dot(up2D) / scale;
   }
 
   /// Angle in degrees between the body line (shoulder→ankle or knee) and the

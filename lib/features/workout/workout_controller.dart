@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart' show CameraLensDirection;
 import 'package:flutter/widgets.dart';
@@ -352,8 +353,27 @@ class WorkoutController extends Notifier<WorkoutState> {
   FormStatus? _persistingForm;
   DateTime? _formSince;
 
+  /// Read once: `ref` must not be used in `onDispose`, where it throws and
+  /// would stop the teardown before the camera is released.
+  late VoiceCoach _voice;
+
+  /// The launch (daily challenge, beat-your-best) this screen was opened
+  /// for, kept so TRY AGAIN retries the same exercise and target.
+  WorkoutLaunch? _launch;
+  bool _launchRead = false;
+
+  /// Reps (or whole seconds) done before a pause, a camera switch or an
+  /// identity re-check; the set resumes from here instead of from zero.
+  int _carriedReps = 0;
+  double _carriedSeconds = 0;
+  double? _carriedFormScore;
+
+  /// The face check was interrupted (app backgrounded): resume repeats it.
+  bool _resumeToVerify = false;
+
   @override
   WorkoutState build() {
+    _voice = ref.read(voiceCoachProvider);
     ref.onDispose(_teardown);
     final settings = ref.read(settingsProvider);
     return WorkoutState(
@@ -365,8 +385,6 @@ class WorkoutController extends Notifier<WorkoutState> {
   }
 
   PoseDetectionService? get service => _service;
-
-  VoiceCoach get _voice => ref.read(voiceCoachProvider);
 
   void _say(VoiceCue cue, {int count = 0, String? label}) {
     final settings = ref.read(settingsProvider);
@@ -399,6 +417,10 @@ class WorkoutController extends Notifier<WorkoutState> {
     _cancelTimers();
     _matchStreak = 0;
     _mismatchStreak = 0;
+    _carriedReps = 0;
+    _carriedSeconds = 0;
+    _carriedFormScore = null;
+    _resumeToVerify = false;
     _voice.resetScript();
     unawaited(_voice.initialize());
     state = state.copyWith(
@@ -438,7 +460,11 @@ class WorkoutController extends Notifier<WorkoutState> {
     }
 
     final settings = ref.read(settingsProvider);
-    final launch = ref.read(workoutLaunchProvider.notifier).consume();
+    if (!_launchRead) {
+      _launchRead = true;
+      _launch = ref.read(workoutLaunchProvider.notifier).consume();
+    }
+    final launch = _launch;
     final exercise = launch?.exercise ?? settings.selectedExercise;
     final target = launch?.target ?? settings.targetFor(exercise);
     final best = PersonalBests.forExercise(
@@ -527,6 +553,22 @@ class WorkoutController extends Notifier<WorkoutState> {
       clearPose: true,
     );
     unawaited(_setWakelock(false));
+    // Release the camera so TRY AGAIN opens a fresh one: a camera that
+    // reported an error still says it is initialised and would be reused.
+    unawaited(_service?.releaseCamera());
+  }
+
+  /// A face-check dead end: stop the camera and the keep-awake until the
+  /// user chooses TRY AGAIN, skip or home.
+  void _faceStop(FaceVerificationStatus status) {
+    _verificationTimer?.cancel();
+    state = state.copyWith(
+      phase: WorkoutPhase.error,
+      faceStatus: status,
+      clearPose: true,
+    );
+    unawaited(_service?.stopStream());
+    unawaited(_setWakelock(false));
   }
 
   void _onDetectionError(PoseDetectionException error) {
@@ -569,12 +611,7 @@ class WorkoutController extends Notifier<WorkoutState> {
       if (state.phase != WorkoutPhase.verifying || started == null) return;
       if (DateTime.now().difference(started) >
           FaceConstants.verificationTimeout) {
-        _verificationTimer?.cancel();
-        state = state.copyWith(
-          phase: WorkoutPhase.error,
-          faceStatus: FaceVerificationStatus.timedOut,
-          clearPose: true,
-        );
+        _faceStop(FaceVerificationStatus.timedOut);
       }
     });
   }
@@ -650,12 +687,7 @@ class WorkoutController extends Notifier<WorkoutState> {
         _mismatchStreak++;
         _matchStreak = 0;
         if (_mismatchStreak >= FaceConstants.mismatchesToReject) {
-          _verificationTimer?.cancel();
-          state = state.copyWith(
-            phase: WorkoutPhase.error,
-            faceStatus: FaceVerificationStatus.mismatched,
-            clearPose: true,
-          );
+          _faceStop(FaceVerificationStatus.mismatched);
         }
       case FaceMatch.unknown:
         state = state.copyWith(
@@ -708,6 +740,7 @@ class WorkoutController extends Notifier<WorkoutState> {
   void _enterCalibration() {
     _calibrationStartedAt = null;
     _persistingForm = null;
+    _carryProgress();
     state = state.copyWith(
       phase: WorkoutPhase.calibrating,
       calibrationProgress: 0,
@@ -761,13 +794,53 @@ class WorkoutController extends Notifier<WorkoutState> {
     if (state.phase != WorkoutPhase.countdown) return;
     // Keep the body tracker warm so the first rep counts right away.
     _analyzer?.resetCounting();
-    _coach.reset();
+    if (_carriedReps == 0) _coach.reset();
     state = state.copyWith(
       phase: WorkoutPhase.active,
-      repCount: 0,
+      repCount: _carriedReps,
+      secondsHeld: _carriedSeconds,
       clearCoachCue: true,
-      mistakes: const {},
+      mistakes: _carriedReps == 0 ? const {} : null,
     );
+  }
+
+  /// When a set that already has reps goes back through calibration
+  /// (resume after a pause, a camera switch, an identity re-check), keep
+  /// what was done: the counter restarts for the remainder only, instead of
+  /// wiping the set and asking for the full target again.
+  void _carryProgress() {
+    final done = state.repCount;
+    if (done <= 0 || done == _carriedReps && _analyzer?.repCount == 0) return;
+    final analyzer = _analyzer;
+    if (analyzer != null && analyzer.formScore != null) {
+      final previous = _carriedFormScore;
+      _carriedFormScore = previous == null
+          ? analyzer.formScore
+          : (previous * _carriedReps +
+                    analyzer.formScore! * (done - _carriedReps)) /
+                done;
+    }
+    _carriedReps = done;
+    _carriedSeconds = state.secondsHeld;
+    final remaining = math.max(1, state.targetReps - done);
+    _analyzer = ExerciseAnalyzerFactory.create(
+      state.exercise,
+      thresholds: PushUpThresholds.forSensitivity(
+        ref.read(settingsProvider).formSensitivity,
+      ),
+      target: remaining,
+    );
+  }
+
+  /// Form score over the whole set, including the part before a resume.
+  double? get _setFormScore {
+    final current = _analyzer?.formScore;
+    final carried = _carriedFormScore;
+    if (carried == null || _carriedReps == 0) return current;
+    if (current == null) return carried;
+    final total = state.repCount;
+    if (total <= 0) return current;
+    return (carried * _carriedReps + current * (total - _carriedReps)) / total;
   }
 
   // ---------------------------------------------------------------------------
@@ -805,11 +878,11 @@ class WorkoutController extends Notifier<WorkoutState> {
           mirror: mirror,
           formStatus: analysis.formStatus,
           isWorking: analysis.isWorking,
-          repCount: analysis.repCount,
+          repCount: _carriedReps + analysis.repCount,
           repJustCounted: analysis.repCounted,
           depth: analysis.depth,
           limbsUsed: analysis.limbsUsed,
-          secondsHeld: analysis.secondsHeld,
+          secondsHeld: _carriedSeconds + analysis.secondsHeld,
           signal: analysis.signal,
           restThreshold: analysis.restThreshold,
           workThreshold: analysis.workThreshold,
@@ -827,7 +900,9 @@ class WorkoutController extends Notifier<WorkoutState> {
         } else if (!analysis.formStatus.isTracking) {
           _maybeSpeakFormCue(analysis.formStatus, pose.timestamp);
         }
-        if (analysis.repCounted) _onRepCounted(analysis.repCount);
+        if (analysis.repCounted) {
+          _onRepCounted(_carriedReps + analysis.repCount);
+        }
         if (analysis.isCompleted) {
           unawaited(_finish(targetReached: true));
         }
@@ -951,6 +1026,7 @@ class WorkoutController extends Notifier<WorkoutState> {
                 targetReps: state.targetReps,
                 reps: count,
                 exercise: state.exercise,
+                verified: state.verified,
               ),
             )
             .catchError((Object e) => debugPrint('Draft save failed: $e')),
@@ -970,6 +1046,7 @@ class WorkoutController extends Notifier<WorkoutState> {
       return;
     }
     final wasRunning = state.isRunning;
+    final wasVerifying = state.phase == WorkoutPhase.verifying;
     _cancelTimers();
     state = state.copyWith(cameraReady: false, clearPose: true);
     try {
@@ -1002,7 +1079,12 @@ class WorkoutController extends Notifier<WorkoutState> {
       lensDirection: service.lensDirection,
     );
     _say(VoiceCue.cameraSwitched);
-    if (wasRunning) _enterCalibration();
+    if (wasRunning) {
+      _enterCalibration();
+    } else if (wasVerifying) {
+      // Restart the check (and its timeout, which the switch cancelled).
+      await _enterVerification();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1037,10 +1119,12 @@ class WorkoutController extends Notifier<WorkoutState> {
         return;
       }
     }
-    // A pause caused by an identity mismatch requires re-verification; a
-    // normal pause resumes through calibration so the user can get back
-    // into position.
-    if (state.pausedByIdentity) {
+    unawaited(_setWakelock(true));
+    // A pause caused by an identity mismatch, or one that interrupted the
+    // face check, requires (re-)verification; a normal pause resumes
+    // through calibration so the user can get back into position.
+    if (state.pausedByIdentity || _resumeToVerify) {
+      _resumeToVerify = false;
       await _enterVerification();
     } else {
       _enterCalibration();
@@ -1056,7 +1140,7 @@ class WorkoutController extends Notifier<WorkoutState> {
     _finishing = true;
     _cancelTimers();
     final reps = state.repCount;
-    final formScore = _analyzer?.formScore;
+    final formScore = _setFormScore;
     final mistakes = Map<FormStatus, int>.from(_coach.mistakes);
     final report = _buildReport();
 
@@ -1144,6 +1228,7 @@ class WorkoutController extends Notifier<WorkoutState> {
       return;
     }
     _cancelTimers();
+    if (state.phase == WorkoutPhase.verifying) _resumeToVerify = true;
     if (state.isRunning || state.phase == WorkoutPhase.verifying) {
       state = state.copyWith(phase: WorkoutPhase.paused, clearPose: true);
     }
@@ -1157,9 +1242,18 @@ class WorkoutController extends Notifier<WorkoutState> {
   /// (so the preview is visible) but counting stays paused until the user
   /// taps resume.
   Future<void> onAppResumed() async {
-    if (_disposed ||
-        state.phase != WorkoutPhase.paused ||
-        !_cameraReleasedByLifecycle) {
+    if (_disposed) return;
+    if (state.phase == WorkoutPhase.error &&
+        state.error?.kind == PoseDetectionErrorKind.permissionDenied) {
+      // Back from the settings app: if the camera was allowed there, carry
+      // on instead of leaving "Open settings" as the only way out.
+      final status = await ref.read(permissionServiceProvider).cameraStatus();
+      if (!_disposed && status == CameraPermissionResult.granted) {
+        await start(bypassIdentity: !state.verified);
+      }
+      return;
+    }
+    if (state.phase != WorkoutPhase.paused || !_cameraReleasedByLifecycle) {
       return;
     }
     final service = _service;
@@ -1209,7 +1303,7 @@ class WorkoutController extends Notifier<WorkoutState> {
   void _teardown() {
     _disposed = true;
     _cancelTimers();
-    unawaited(ref.read(voiceCoachProvider).stop());
+    unawaited(_voice.stop());
     final service = _service;
     final face = _faceService;
     _service = null;

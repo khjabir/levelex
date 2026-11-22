@@ -34,6 +34,8 @@ class CycleConfig {
     this.minWorkDuration = const Duration(milliseconds: 250),
     this.cooldown = const Duration(milliseconds: 400),
     this.shallowFraction = 0.4,
+    this.maxDropout = const Duration(milliseconds: 900),
+    this.maxAdaptiveLoosening,
   });
 
   /// Default threshold for the rest position (before adapting).
@@ -74,6 +76,15 @@ class CycleConfig {
   /// an aborted descent is reported as a shallow attempt. Below this it is
   /// treated as a wobble and ignored.
   final double shallowFraction;
+
+  /// A gap in tracking up to this long (fast moves blur, ML Kit drops the
+  /// body for a frame) keeps the rep in progress; a longer one starts over.
+  final Duration maxDropout;
+
+  /// How far past the default work threshold the adaptive one may move
+  /// towards the rest position (null: no limit). Keeps a user's habitual
+  /// quarter reps from teaching the counter to accept quarter reps.
+  final double? maxAdaptiveLoosening;
 }
 
 /// Result of feeding one frame to [RepCycleCounter].
@@ -127,6 +138,7 @@ class RepCycleCounter {
   double? _min;
   double _attemptPeak = 0;
   bool _attemptVetoed = false;
+  DateTime? _lastValidAt;
 
   CyclePhase get phase => _phase;
   int get repCount => _reps;
@@ -145,10 +157,23 @@ class RepCycleCounter {
     _min = null;
     _attemptPeak = 0;
     _attemptVetoed = false;
+    _lastValidAt = null;
+  }
+
+  /// A frame without a usable body. The phase survives a short dropout so a
+  /// rep that blurs for a frame still counts; debouncing restarts.
+  void hold(DateTime now) {
+    _pending = null;
+    _pendingFrames = 0;
+    final last = _lastValidAt;
+    if (last == null || now.difference(last) > config.maxDropout) {
+      invalidate();
+    }
   }
 
   /// Drops in-flight debouncing and returns to [CyclePhase.ready] without
-  /// touching the count (used after a track break or orientation change).
+  /// touching the count (used after a long track break or an orientation
+  /// change).
   void invalidate() {
     _pending = null;
     _pendingFrames = 0;
@@ -156,6 +181,7 @@ class RepCycleCounter {
     _workEnteredAt = null;
     _attemptPeak = 0;
     _attemptVetoed = false;
+    _lastValidAt = null;
   }
 
   (double, double) _thresholds() {
@@ -174,6 +200,12 @@ class RepCycleCounter {
         } else {
           rest = lo;
           work = hi;
+        }
+        final loosen = config.maxAdaptiveLoosening;
+        if (loosen != null) {
+          work = config.restIsHigh
+              ? math.min(work, config.workDefault + loosen)
+              : math.max(work, config.workDefault - loosen);
         }
       }
     }
@@ -204,6 +236,11 @@ class RepCycleCounter {
     bool Function()? vetoWork,
     bool Function()? vetoRest,
   }) {
+    final last = _lastValidAt;
+    if (last != null && now.difference(last) > config.maxDropout) {
+      // Too long without a usable frame: whatever was in flight is stale.
+      invalidate();
+    }
     if (!valid || signal == null) {
       _pending = null;
       _pendingFrames = 0;
@@ -217,6 +254,7 @@ class RepCycleCounter {
         rejection: CycleRejection.notValid,
       );
     }
+    _lastValidAt = now;
     _observe(signal);
     final (rest, work) = _thresholds();
     final depth = _depth(signal, rest, work);

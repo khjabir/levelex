@@ -46,6 +46,20 @@ class PtRecordsNotifier extends Notifier<List<PtRecord>> {
     unawaited(ref.read(streakNudgeProvider).sync());
   }
 
+  /// Saves many records (backup import) with one state refresh and one
+  /// nudge sync, instead of re-reading everything per record.
+  Future<void> addAll(Iterable<PtRecord> records) async {
+    final repo = ref.read(ptRepositoryProvider);
+    var any = false;
+    for (final r in records) {
+      await repo.upsertRecord(r);
+      any = true;
+    }
+    if (!any) return;
+    state = repo.records();
+    unawaited(ref.read(streakNudgeProvider).sync());
+  }
+
   Future<void> clear() async {
     await ref.read(ptRepositoryProvider).clearRecords();
     state = const [];
@@ -104,15 +118,34 @@ class PtPlanNotifier extends Notifier<WorkoutPlan?> {
   }
 
   /// Replaces [item] with a different movement for the same muscles.
+  ///
+  /// Screens show the annotated plan (suggested loads), whose items are
+  /// copies, so [item] is matched back to this plan's own item; matching by
+  /// identity alone silently swapped nothing for every loaded movement.
   bool swap(PlanItem item) {
     final current = state;
     if (current == null) return false;
+    final own = _ownItem(current, item);
+    if (own == null) return false;
     final alt = ref
         .read(workoutPlannerProvider)
-        .alternative(current, item, seed: DateTime.now().millisecond);
+        .alternative(current, own, seed: DateTime.now().millisecond);
     if (alt == null) return false;
-    state = current.replace(item, alt);
+    state = current.replace(own, alt);
     return true;
+  }
+
+  static PlanItem? _ownItem(WorkoutPlan plan, PlanItem item) {
+    for (final i in plan.all) {
+      if (identical(i, item)) return i;
+    }
+    for (final i in plan.items(item.phase)) {
+      if (i.movement.id == item.movement.id && i.sets == item.sets) return i;
+    }
+    for (final i in plan.items(item.phase)) {
+      if (i.movement.id == item.movement.id) return i;
+    }
+    return null;
   }
 
   void set(WorkoutPlan plan) => state = plan;

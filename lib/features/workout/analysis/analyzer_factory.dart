@@ -1,6 +1,7 @@
 import '../../../core/constants/app_constants.dart';
 import '../../../models/exercise.dart';
 import '../push_up_analyzer.dart';
+import 'alternating_analyzer.dart';
 import 'floor_analyzers.dart';
 import 'generic_analyzers.dart';
 import 'leg_analyzers.dart';
@@ -42,14 +43,7 @@ abstract final class ExerciseAnalyzerFactory {
       thresholds: thresholds,
       targetSeconds: target,
     ),
-    ExerciseType.gluteBridge => GenericAngleAnalyzer(
-      spec: const AngleTracking(
-        joint: JointKind.hip,
-        restAngle: 120,
-        workAngle: 165,
-      ),
-      label: type.label,
-      exerciseType: type,
+    ExerciseType.gluteBridge => GluteBridgeAnalyzer(
       thresholds: thresholds,
       targetReps: target,
     ),
@@ -64,39 +58,19 @@ abstract final class ExerciseAnalyzerFactory {
       thresholds: thresholds,
       targetSeconds: target,
     ),
-    ExerciseType.highKnees => GenericAngleAnalyzer(
-      spec: const AngleTracking(
-        joint: JointKind.hip,
-        restAngle: 160,
-        workAngle: 105,
-        requireUpright: true,
-        aggregate: SideAggregate.min,
-      ),
-      label: type.label,
+    ExerciseType.highKnees => AlternatingKneeAnalyzer(
       exerciseType: type,
+      stance: AlternatingStance.standing,
       thresholds: thresholds,
       targetReps: target,
     ),
-    ExerciseType.mountainClimber => GenericAngleAnalyzer(
-      spec: const AngleTracking(
-        joint: JointKind.hip,
-        restAngle: 155,
-        workAngle: 100,
-        aggregate: SideAggregate.min,
-      ),
-      label: type.label,
+    ExerciseType.mountainClimber => AlternatingKneeAnalyzer(
       exerciseType: type,
+      stance: AlternatingStance.plank,
       thresholds: thresholds,
       targetReps: target,
     ),
-    ExerciseType.tricepDip => GenericAngleAnalyzer(
-      spec: const AngleTracking(
-        joint: JointKind.elbow,
-        restAngle: 160,
-        workAngle: 95,
-      ),
-      label: type.label,
-      exerciseType: type,
+    ExerciseType.tricepDip => TricepDipAnalyzer(
       thresholds: thresholds,
       targetReps: target,
     ),

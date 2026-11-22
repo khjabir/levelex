@@ -75,9 +75,7 @@ abstract final class BackupActions {
     final bundle = BackupCodec.decode(json);
     await ref.read(sessionRepositoryProvider).upsertAll(bundle.sessions);
     ref.invalidate(sessionsProvider);
-    for (final r in bundle.ptRecords) {
-      await ref.read(ptRecordsProvider.notifier).add(r);
-    }
+    await ref.read(ptRecordsProvider.notifier).addAll(bundle.ptRecords);
     final challenges = ref.read(challengeRepositoryProvider);
     for (final c in bundle.challenges) {
       await challenges.upsert(c);
@@ -92,6 +90,9 @@ abstract final class BackupActions {
       ]);
     }
     ref.invalidate(challengeRecordsProvider);
+    // The set-up screen's notifier read the players once; rebuild it so its
+    // next edit does not save the old list over the imported players.
+    ref.invalidate(challengeConfigProvider);
     await ref.read(liftLogProvider.notifier).addAll(bundle.lifts);
     await ref.read(bodyWeightProvider.notifier).addAll(bundle.bodyWeights);
     await ref.read(routinesProvider.notifier).addAll(bundle.routines);

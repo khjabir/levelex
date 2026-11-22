@@ -62,14 +62,20 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
       if (e.source != LiftSource.pt) bump(e.startTime);
     }
     final activeDays = activity.length;
+    final restWeekdays = ref.watch(
+      settingsProvider.select((s) => s.restWeekdays),
+    );
+    // Same rest days as the home screen's streak.
     final streak = StatsCalculator.currentStreak(
       sessions,
       now,
       ptRecords: ptRecords,
+      restWeekdays: restWeekdays,
     );
     final longest = StatsCalculator.longestStreak(
       sessions,
       ptRecords: ptRecords,
+      restWeekdays: restWeekdays,
     );
 
     final recovery = MuscleRecovery.compute(

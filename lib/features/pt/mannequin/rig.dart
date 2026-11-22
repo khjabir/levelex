@@ -413,7 +413,24 @@ abstract final class Rig {
       if (v.z > maxZ) maxZ = v.z;
     });
     final shift = Vec3(-(minX + maxX) / 2, -minY + p.lift, -(minZ + maxZ) / 2);
-    return {for (final e in joints.entries) e.key: e.value + shift};
+    final out = {for (final e in joints.entries) e.key: e.value + shift};
+    // A foot whose ankle is on the floor lies flat, pointing away from the
+    // hips. The foot is attached to the body's facing, which points at the
+    // sky when lying on the back, so knees-bent floor work (sit-ups,
+    // bridges) had its toes sticking up and the feet hovering.
+    for (final (ankle, toe) in const [('ankleL', 'toeL'), ('ankleR', 'toeR')]) {
+      final a = out[ankle]!, t = out[toe]!;
+      if (a.y - p.lift > 0.12 || t.y - a.y < 0.03) continue;
+      var dir = Vec3(t.x - a.x, 0, t.z - a.z);
+      if (dir.length < 0.05) {
+        final pelvis = out['pelvis']!;
+        dir = Vec3(a.x - pelvis.x, 0, a.z - pelvis.z);
+      }
+      if (dir.length < 1e-6) continue;
+      final flat = dir.normalized * foot;
+      out[toe] = Vec3(a.x + flat.x, math.max(p.lift, a.y - 0.02), a.z + flat.z);
+    }
+    return out;
   }
 }
 
@@ -471,6 +488,156 @@ class MannequinClip {
 
   int get totalMs => _segments.fold(0, (a, s) => a + s.$3);
 
+  // ---------------------------------------------------------------------------
+  // Ground contacts
+  // ---------------------------------------------------------------------------
+
+  /// Joints that can carry weight on the floor.
+  static const _contactJoints = [
+    'toeL',
+    'toeR',
+    'ankleL',
+    'ankleR',
+    'handL',
+    'handR',
+    'wristL',
+    'wristR',
+    'kneeL',
+    'kneeR',
+    'pelvis',
+    'chest',
+    'head',
+  ];
+
+  /// A joint this close to the floor is planted.
+  static const _contactHeight = 0.09;
+
+  /// Solved keyframes, their planted joints and offsets, computed once per
+  /// clip (the class is const, so they live beside it).
+  static final _cache = Expando<_ClipContacts>();
+
+  _ClipContacts get _c => _cache[this] ??= _ClipContacts(this);
+
+  List<Map<String, Vec3>> get _solved => _c.solved;
+  List<Set<String>> get _contacts => _c.contacts;
+
+  /// Horizontal translation of each keyframe that keeps the joints planted
+  /// in both neighbouring keyframes (feet, hands, hips, back) in the same
+  /// place, instead of re-centring every pose, which made hands and feet
+  /// slide across the floor. Airborne transitions keep the pelvis over the
+  /// same spot. Loops that would drift spread the drift over the loop.
+  List<Vec3> get keyOffsets => _c.offsets ??= _computeOffsets();
+
+  /// Priority of a planted joint when hands and feet disagree (the hands
+  /// stay while the feet jump back in a burpee).
+  static int _priority(String joint) => switch (joint) {
+    'wristL' || 'wristR' || 'handL' || 'handR' => 3,
+    'toeL' || 'toeR' || 'ankleL' || 'ankleR' => 2,
+    'kneeL' || 'kneeR' => 1,
+    _ => 0,
+  };
+
+  /// The planted joints that stay put between keyframes [a] and [b]: the
+  /// largest set that agrees on one translation (hands first, then feet),
+  /// so a foot that steps or jumps is not averaged with the one that stays.
+  Set<String> _anchors(int a, int b) {
+    final key = a < b ? (a, b) : (b, a);
+    return _c.anchors[key] ??= () {
+      final common = _contacts[a].intersection(_contacts[b]);
+      if (common.isEmpty) return const {'pelvis'};
+      final ja = _solved[a], jb = _solved[b];
+      Vec3 implied(String n) {
+        final d = ja[n]! - jb[n]!;
+        return Vec3(d.x, 0, d.z);
+      }
+
+      Set<String>? best;
+      (int, int, double)? bestScore;
+      for (final n in common) {
+        final c = implied(n);
+        final inliers = {
+          for (final m in common)
+            if ((implied(m) - c).length < 0.03) m,
+        };
+        final score = (
+          inliers.length,
+          inliers.map(_priority).reduce(math.max),
+          -c.length,
+        );
+        final s = bestScore;
+        if (s == null ||
+            score.$1 > s.$1 ||
+            (score.$1 == s.$1 && score.$2 > s.$2) ||
+            (score.$1 == s.$1 && score.$2 == s.$2 && score.$3 > s.$3)) {
+          best = inliers;
+          bestScore = score;
+        }
+      }
+      return best!;
+    }();
+  }
+
+  Vec3 _step(int a, int b, Vec3 offA) {
+    final ja = _solved[a], jb = _solved[b];
+    final names = _anchors(a, b);
+    var sum = Vec3.zero;
+    for (final n in names) {
+      final d = ja[n]! + offA - jb[n]!;
+      sum = sum + Vec3(d.x, 0, d.z);
+    }
+    return sum * (1 / names.length);
+  }
+
+  List<Vec3> _computeOffsets() {
+    final n = frames.length;
+    final offs = List<Vec3>.filled(n, Vec3.zero);
+    for (var i = 1; i < n; i++) {
+      offs[i] = _step(i - 1, i, offs[i - 1]);
+    }
+    if (!pingPong && n > 1) {
+      final drift = _step(n - 1, 0, offs[n - 1]) - offs[0];
+      for (var i = 1; i < n; i++) {
+        offs[i] = offs[i] - drift * (i / n);
+      }
+    }
+    var mean = Vec3.zero;
+    for (final o in offs) {
+      mean = mean + o;
+    }
+    mean = mean * (1 / n);
+    return [for (final o in offs) o - mean];
+  }
+
+  /// Keyframe [i]'s joints, planted (see [keyOffsets]).
+  Map<String, Vec3> keyJoints(int i) => {
+    for (final e in _solved[i].entries) e.key: e.value + keyOffsets[i],
+  };
+
+  /// Translation to add to `Rig.solve(at(ms))` so the joints planted at
+  /// both ends of the current segment stay exactly where they are.
+  Vec3 offsetAt(int ms) {
+    if (frames.length < 2) return keyOffsets.first;
+    var t = ms % totalMs;
+    for (final (a, b, d) in _segmentIndices) {
+      if (t < d) {
+        final u = _ease(d == 0 ? 1.0 : t / d);
+        final joints = Rig.solve(RigPose.lerp(frames[a], frames[b], u));
+        final names = _anchors(a, b);
+        var sum = Vec3.zero;
+        for (final n in names) {
+          final wa = _solved[a][n]! + keyOffsets[a];
+          final wb = _solved[b][n]! + keyOffsets[b];
+          final world = wa + (wb - wa) * u;
+          final dv = world - joints[n]!;
+          sum = sum + Vec3(dv.x, 0, dv.z);
+        }
+        return sum * (1 / names.length);
+      }
+      t -= d;
+    }
+    return keyOffsets.first;
+  }
+
   RigPose at(int ms) {
     final segs = _segments;
     var t = ms % totalMs;
@@ -513,17 +680,29 @@ class MannequinClip {
   /// Fractional keyframe position at [ms] (e.g. 1.5 = half way from
   /// keyframe 1 to keyframe 2), with the same easing as [at], so a skinned
   /// body animated from the same keyframes stays in step with the rig.
+  ///
+  /// A loop that does not ping-pong closes from its last keyframe to a copy
+  /// of the first at position [frames.length] (see [hasClosingKey]); going
+  /// from the last position back down to 0 swept the body through every
+  /// keyframe in between (a burpee flashed back through the plank).
   double framePosition(int ms) {
     var t = ms % totalMs;
     for (final (a, b, d) in _segmentIndices) {
       if (t < d) {
         final u = d == 0 ? 1.0 : t / d;
+        if (hasClosingKey && a == frames.length - 1 && b == 0) {
+          return a + _ease(u);
+        }
         return a + (b - a) * _ease(u);
       }
       t -= d;
     }
     return 0;
   }
+
+  /// Whether the skinned body's animation carries an extra keyframe, a copy
+  /// of the first, after the last one (loops that do not ping-pong).
+  bool get hasClosingKey => !pingPong && frames.length > 1;
 }
 
 /// World-space extents of a clip, used to frame the camera so every pose of
@@ -553,6 +732,40 @@ class MannequinFrame {
     );
   }
 
-  factory MannequinFrame.ofClip(MannequinClip clip) =>
-      MannequinFrame.ofPoses(clip.frames);
+  /// Extents of a clip's keyframes, including how far its planted
+  /// contacts move the body around (see [MannequinClip.keyOffsets]).
+  factory MannequinFrame.ofClip(MannequinClip clip) {
+    var maxY = 0.0, maxR = 0.0;
+    for (var i = 0; i < clip.frames.length; i++) {
+      for (final v in clip.keyJoints(i).values) {
+        if (v.y > maxY) maxY = v.y;
+        final r = math.sqrt(v.x * v.x + v.z * v.z);
+        if (r > maxR) maxR = r;
+      }
+    }
+    return MannequinFrame(
+      height: math.max(maxY, 0.5),
+      halfWidth: math.max(maxR, 0.3),
+    );
+  }
+}
+
+class _ClipContacts {
+  _ClipContacts(MannequinClip clip)
+    : solved = [for (final f in clip.frames) Rig.solve(f)] {
+    contacts = [
+      for (final j in solved)
+        {
+          for (final n in MannequinClip._contactJoints)
+            if (j[n]!.y - (n == 'head' ? Rig.headRadius : 0) <
+                MannequinClip._contactHeight)
+              n,
+        },
+    ];
+  }
+
+  final List<Map<String, Vec3>> solved;
+  late final List<Set<String>> contacts;
+  final Map<(int, int), Set<String>> anchors = {};
+  List<Vec3>? offsets;
 }

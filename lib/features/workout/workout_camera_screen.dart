@@ -59,7 +59,10 @@ class _WorkoutCameraScreenState extends ConsumerState<WorkoutCameraScreen>
     if (!mounted) return;
     final controller = ref.read(workoutControllerProvider.notifier);
     switch (state) {
+      // `inactive` is a system dialog, the notification shade or a call
+      // banner with the app still on screen: keep counting.
       case AppLifecycleState.inactive:
+        break;
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
       case AppLifecycleState.detached:
@@ -167,11 +170,15 @@ class _WorkoutCameraScreenState extends ConsumerState<WorkoutCameraScreen>
                     onSwitchCamera: controller.switchCamera,
                   ),
                   if (state.identityWarning) const _IdentityBanner(),
+                  // Scrolls when the panel is taller than the space left
+                  // (landscape, large text), so its buttons stay reachable.
                   Expanded(
                     child: Center(
-                      child: _CenterOverlay(
-                        state: state,
-                        controller: controller,
+                      child: SingleChildScrollView(
+                        child: _CenterOverlay(
+                          state: state,
+                          controller: controller,
+                        ),
                       ),
                     ),
                   ),

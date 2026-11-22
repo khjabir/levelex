@@ -98,6 +98,8 @@ class PushUpThresholds {
     this.maxWristTravelRatio = 1.0,
     this.maxHandsRaisedRatio = -0.45,
     this.shallowFraction = 0.4,
+    this.pushUpDropRatio = 0.8,
+    this.squatDropRatio = 0.76,
   });
 
   /// Builds thresholds for a coaching strictness. Relaxed counts shallower,
@@ -112,6 +114,8 @@ class PushUpThresholds {
         straightBodyMinAngle: 145,
         hipDeviationRatio: 0.14,
         shallowFraction: 0.5,
+        pushUpDropRatio: 0.86,
+        squatDropRatio: 0.82,
       ),
       FormSensitivity.medium => const PushUpThresholds(),
       FormSensitivity.high => const PushUpThresholds(
@@ -121,6 +125,8 @@ class PushUpThresholds {
         straightBodyMinAngle: 162,
         hipDeviationRatio: 0.08,
         shallowFraction: 0.3,
+        pushUpDropRatio: 0.68,
+        squatDropRatio: 0.64,
       ),
     };
   }
@@ -191,6 +197,15 @@ class PushUpThresholds {
   /// How far (0..1) towards the work position an aborted rep must get before
   /// the coach calls it "too shallow".
   final double shallowFraction;
+
+  /// Push-ups (and dips) count when the shoulders come down to this
+  /// fraction of their height above the hands at the top (1 = no movement,
+  /// ~0.8 ≈ elbows at 105°, ~0.7 ≈ 90°, ~0.45 = chest near the floor).
+  final double pushUpDropRatio;
+
+  /// Squats count when the hips come down to this fraction of their
+  /// standing height above the ankles (~0.55 = thighs parallel).
+  final double squatDropRatio;
 }
 
 /// Frame-processing limits for the camera pipeline.

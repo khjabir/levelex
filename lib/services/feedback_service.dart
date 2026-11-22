@@ -17,13 +17,19 @@ class FeedbackService {
     if (_configured) return;
     _configured = true;
     try {
-      // Short UI sound: don't take audio focus from music apps and respect
-      // the iOS silent switch.
+      // Short UI sound: don't take audio focus from music apps. On iOS the
+      // audio session is shared with the voice coach, so it uses the same
+      // playback category: switching the whole app to "ambient" for the
+      // chime silenced every spoken cue after the first set whenever the
+      // silent switch was on.
       await AudioPlayer.global.setAudioContext(
         AudioContext(
           iOS: AudioContextIOS(
-            category: AVAudioSessionCategory.ambient,
-            options: const {AVAudioSessionOptions.mixWithOthers},
+            category: AVAudioSessionCategory.playback,
+            options: const {
+              AVAudioSessionOptions.mixWithOthers,
+              AVAudioSessionOptions.duckOthers,
+            },
           ),
           android: const AudioContextAndroid(
             isSpeakerphoneOn: false,

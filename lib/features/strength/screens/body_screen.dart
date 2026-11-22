@@ -372,11 +372,24 @@ class _BodyScreenState extends ConsumerState<BodyScreen> {
         ),
       ),
     );
-    if (result != null && result > 0) {
-      await ref
-          .read(bodyWeightProvider.notifier)
-          .log(unit.toKg(result), day: date);
+    if (result == null) return;
+    final kg = unit.toKg(result);
+    // A human body weight: 20-400 kg. "800" typed for "80.0" (or a pasted
+    // 1e9) would otherwise be stored and wreck the chart and averages.
+    if (!kg.isFinite || kg < 20 || kg > 400) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'That does not look like a body weight. Enter between '
+              '${unit == WeightUnit.kg ? '20 and 400 kg' : '45 and 880 lb'}.',
+            ),
+          ),
+        );
+      }
+      return;
     }
+    await ref.read(bodyWeightProvider.notifier).log(kg, day: date);
   }
 
   Future<void> _editGoal(double? goalKg, WeightUnit unit) async {

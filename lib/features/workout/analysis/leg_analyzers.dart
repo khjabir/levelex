@@ -5,6 +5,7 @@ import '../../../models/form_status.dart';
 import '../../../models/pose_result.dart';
 import 'exercise_analyzer.dart';
 import 'rep_cycle_counter.dart';
+import 'signals.dart';
 
 /// Shared behaviour for standing leg exercises (squats, lunges): the body is
 /// upright, the feet stay planted and the hips travel down and up.
@@ -101,67 +102,93 @@ abstract class _StandingLegAnalyzer extends CycleExerciseAnalyzer {
   }
 }
 
-/// Squats: knee angle averaged over both legs. Rest ≈ 160°+, work ≈ 110°.
+/// Squats: how high the hips are above the ankles, as a fraction of the
+/// standing height (1 standing, ~0.55 thighs parallel). The knee angle is
+/// blind from the front, where the knees bend towards the camera; the hips
+/// dropping is visible from every side.
 class SquatAnalyzer extends _StandingLegAnalyzer {
   SquatAnalyzer({super.thresholds = const PushUpThresholds(), int? targetReps})
     : super(
         target: targetReps,
         cycle: CycleConfig(
-          restDefault: 160,
-          workDefault: 110,
-          minRange: 35,
+          restDefault: 0.9,
+          workDefault: thresholds.squatDropRatio,
+          minRange: 0.2,
           margin: 0.3,
+          minGap: 0.08,
+          decayPerFrame: 0.0015,
+          maxAdaptiveLoosening: 0.05,
           minFrames: thresholds.minFramesForTransition,
           minWorkDuration: const Duration(milliseconds: 250),
           cooldown: const Duration(milliseconds: 400),
+          shallowFraction: thresholds.shallowFraction,
         ),
       );
+
+  final DropRatio _drop = DropRatio();
 
   @override
   ExerciseType get type => ExerciseType.squat;
 
   @override
   double? signal(PoseResult pose) {
-    var sum = 0.0;
-    var n = 0;
-    for (final side in legs(pose)) {
-      final a = pose.kneeAngle(side);
-      if (a == null) continue;
-      sum += a;
-      n++;
-    }
-    return n == 0 ? null : sum / n;
+    final l = legs(pose);
+    if (l.isEmpty) return null;
+    final h = pose.heightBetween(l.map((s) => s.hip), l.map((s) => s.ankle));
+    return _drop.update(h, pose.timestamp);
+  }
+
+  @override
+  void reset() {
+    super.reset();
+    _drop.reset();
   }
 }
 
-/// Lunges: the most-bent knee. Rest ≈ 160°+, work ≈ 115°. Either leg counts.
+/// Lunges: how high the hips are above the planted (lower) foot, as a
+/// fraction of the standing height, like the squat. The back heel lifts, so
+/// the lower ankle is the reference. Either leg counts.
 class LungeAnalyzer extends _StandingLegAnalyzer {
   LungeAnalyzer({super.thresholds = const PushUpThresholds(), int? targetReps})
     : super(
         target: targetReps,
         cycle: CycleConfig(
-          restDefault: 160,
-          workDefault: 115,
-          minRange: 35,
+          restDefault: 0.9,
+          workDefault: thresholds.squatDropRatio + 0.04,
+          minRange: 0.18,
           margin: 0.3,
+          minGap: 0.07,
+          decayPerFrame: 0.0015,
+          maxAdaptiveLoosening: 0.05,
           minFrames: thresholds.minFramesForTransition,
-          minWorkDuration: const Duration(milliseconds: 250),
+          minWorkDuration: const Duration(milliseconds: 200),
           cooldown: const Duration(milliseconds: 400),
+          shallowFraction: thresholds.shallowFraction,
         ),
       );
+
+  final DropRatio _drop = DropRatio();
 
   @override
   ExerciseType get type => ExerciseType.lunge;
 
   @override
   double? signal(PoseResult pose) {
-    double? min;
-    for (final side in legs(pose)) {
-      final a = pose.kneeAngle(side);
-      if (a == null) continue;
-      min = min == null || a < min ? a : min;
+    final l = legs(pose);
+    if (l.isEmpty) return null;
+    double? lowest;
+    for (final side in l) {
+      final h = pose.heightBetween(l.map((s) => s.hip), [side.ankle]);
+      if (h == null) continue;
+      lowest = lowest == null || h > lowest ? h : lowest;
     }
-    return min;
+    return _drop.update(lowest, pose.timestamp);
+  }
+
+  @override
+  void reset() {
+    super.reset();
+    _drop.reset();
   }
 
   /// Lunges step forward, so the feet are allowed to move.

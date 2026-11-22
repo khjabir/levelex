@@ -44,8 +44,8 @@ enum ExerciseType {
     defaultTarget: 20,
     tagline: 'Full-body cardio.',
     placement:
-        'Face the camera from 2–3 m away with room to spread your arms and '
-        'legs; keep your hands in frame when they are overhead.',
+        'Face the camera (best: it sees your feet spread) or stand side-on '
+        '2–3 m away; keep your hands in frame when they are overhead.',
     cues: [
       'Start with feet together and arms by your sides.',
       'Jump your feet apart while raising your arms overhead.',
@@ -60,8 +60,8 @@ enum ExerciseType {
     defaultTarget: 8,
     tagline: 'Everything at once.',
     placement:
-        'Prop the phone 3 m away from the side so both standing and the '
-        'floor position fit in the frame.',
+        'Prop the phone 3 m away, at the side or in front, so both standing '
+        'and the floor position fit in the frame.',
     cues: [
       'From standing, drop into a plank with your hands on the floor.',
       'Return to standing (add the jump if you like).',
@@ -92,8 +92,9 @@ enum ExerciseType {
     defaultTarget: 15,
     tagline: 'Abs.',
     placement:
-        'Prop the phone 2–3 m away at the side, low to the floor, so your '
-        'torso and knees are visible.',
+        'Prop the phone 2–3 m away at the side (or a diagonal), low to the '
+        'floor, so your torso and knees are visible. Not at your head or '
+        'feet: lying flat you are hard to see end-on.',
     cues: [
       'Lie on your back with knees bent and feet on the floor.',
       'Curl up until your torso is upright, then lower back down.',
@@ -124,8 +125,9 @@ enum ExerciseType {
     defaultTarget: 15,
     tagline: 'Glutes and hamstrings.',
     placement:
-        'Prop the phone 2 m away at the side, low to the floor, so your '
-        'shoulders, hips and knees are visible.',
+        'Prop the phone 2 m away at the side (or a diagonal), low to the '
+        'floor, so your shoulders, hips and knees are visible. At your feet '
+        'the knees hide the hips.',
     cues: [
       'Lie on your back, knees bent, feet flat and hip-width apart.',
       'Drive through the heels until shoulders, hips and knees line up.',
@@ -157,7 +159,7 @@ enum ExerciseType {
     tagline: 'Cardio burst.',
     placement:
         'Face the camera or stand side-on 2–3 m away with your whole body in '
-        'frame.',
+        'frame. Each knee drive counts.',
     cues: [
       'Run on the spot and drive each knee up to hip height.',
       'Stay tall, pump the arms, land softly.',
@@ -172,8 +174,9 @@ enum ExerciseType {
     defaultTarget: 20,
     tagline: 'Core and cardio.',
     placement:
-        'Prop the phone 2–3 m away at the side, low to the floor, with your '
-        'whole body in frame.',
+        'Prop the phone 2–3 m away at the side or a diagonal, low to the '
+        'floor, with your whole body in frame (not at your head: the knees '
+        'then drive straight at the camera). Each knee drive counts.',
     cues: [
       'Start in a high plank, hands under the shoulders.',
       'Drive one knee towards the chest, switch legs quickly.',

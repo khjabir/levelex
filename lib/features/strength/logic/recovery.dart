@@ -152,7 +152,10 @@ abstract final class MuscleRecovery {
     required DateTime now,
   }) {
     final occasions = <_Occasion>[
-      for (final lift in lifts) ?_fromLift(lift),
+      // MY PT writes every main item to the lift log as well; the PtRecord
+      // already counts those sets, so its copies would count twice.
+      for (final lift in lifts)
+        if (lift.source != LiftSource.pt) ?_fromLift(lift),
       for (final record in ptRecords) ?_fromPtRecord(record),
       for (final session in sessions) ?_fromSession(session),
     ];

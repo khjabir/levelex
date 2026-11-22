@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../../core/constants/app_constants.dart';
 import '../../../models/exercise.dart';
 import '../../../models/form_status.dart';
@@ -6,6 +8,7 @@ import 'analyzer_factory.dart';
 import 'body_tracker.dart';
 import 'exercise_analyzer.dart';
 import 'rep_cycle_counter.dart';
+import 'signals.dart';
 import 'tracking_diagnostics.dart';
 import 'tracking_spec.dart';
 
@@ -38,7 +41,7 @@ class GenericAngleAnalyzer extends CycleExerciseAnalyzer {
            adaptive: true,
            minRange: 60,
            margin: 0.3,
-           minGap: 15,
+           minGap: spec.minGap,
            minFrames: thresholds.minFramesForTransition,
            minWorkDuration: const Duration(milliseconds: 150),
            cooldown: const Duration(milliseconds: 300),
@@ -102,6 +105,82 @@ class GenericAngleAnalyzer extends CycleExerciseAnalyzer {
     if (torso == 0) return false;
     final up = pose.heightAbove(side.shoulder, side.hip, torso);
     return up != null && up > 0.5;
+  }
+
+  @override
+  FormStatus evaluateForm(PoseResult pose, BodySide side) =>
+      FormStatus.goodForm;
+}
+
+/// Tricep dips (hands on a bench or chair behind, body upright): the
+/// shoulders' height above the hands as a fraction of the top, like the
+/// push-up. The elbow angle is blind when the camera faces the user.
+class TricepDipAnalyzer extends CycleExerciseAnalyzer {
+  TricepDipAnalyzer({
+    super.thresholds = const PushUpThresholds(),
+    int? targetReps,
+  }) : super(
+         target: targetReps,
+         cycle: CycleConfig(
+           // Bench dips drop the shoulders less than push-ups, and seen
+           // from the front perspective hides part of the drop.
+           restDefault: 0.92,
+           workDefault: math.min(0.86, thresholds.pushUpDropRatio + 0.04),
+           minRange: 0.15,
+           margin: thresholds.adaptiveMargin,
+           minGap: 0.08,
+           decayPerFrame: 0.0015,
+           maxAdaptiveLoosening: 0.05,
+           minFrames: thresholds.minFramesForTransition,
+           minWorkDuration: const Duration(milliseconds: 200),
+           cooldown: const Duration(milliseconds: 350),
+           shallowFraction: thresholds.shallowFraction,
+         ),
+       );
+
+  final DropRatio _drop = DropRatio();
+
+  @override
+  ExerciseType get type => ExerciseType.tricepDip;
+
+  List<BodySide> _arms(PoseResult pose) => [
+    for (final side in BodySide.values)
+      if (jointsOk(pose, [side.shoulder, side.elbow, side.wrist])) side,
+  ];
+
+  @override
+  int limbsUsed(PoseResult pose) => _arms(pose).length;
+
+  @override
+  bool countable(PoseResult pose) => _arms(pose).isNotEmpty;
+
+  /// Torso upright and hands below the shoulders.
+  @override
+  bool inPosition(PoseResult pose) {
+    final side = chooseSide(pose);
+    if (side == null) return false;
+    final torso = pose.distance2D(side.shoulder, side.hip) ?? 0;
+    if (torso == 0) return false;
+    final up = pose.heightAbove(side.shoulder, side.hip, torso);
+    final hands = pose.wristBelowShoulderRatio(side);
+    return up != null && up > 0.4 && hands != null && hands > 0;
+  }
+
+  @override
+  double? signal(PoseResult pose) {
+    final arms = _arms(pose);
+    if (arms.isEmpty) return null;
+    final h = pose.heightBetween(
+      arms.map((s) => s.shoulder),
+      arms.map((s) => s.wrist),
+    );
+    return _drop.update(h, pose.timestamp);
+  }
+
+  @override
+  void reset() {
+    super.reset();
+    _drop.reset();
   }
 
   @override
@@ -185,6 +264,33 @@ class GenericHoldAnalyzer implements ExerciseAnalyzer {
     return null;
   }
 
+  /// Seen from the front, a bent knee points at the camera and its 2D
+  /// angle reads almost straight. A seated knee hold is then recognised by
+  /// its shape instead: thighs about level (hips near knee height) over
+  /// upright shins.
+  bool _kneeHoldShape(PoseResult pose) {
+    if (spec.joint != JointKind.knee) return false;
+    for (final side in BodySide.values) {
+      final ok = [
+        side.hip,
+        side.knee,
+        side.ankle,
+      ].every((t) => pose.confidenceOf(t) >= thresholds.minLandmarkConfidence);
+      if (!ok) continue;
+      final shin = pose.distance2D(side.knee, side.ankle) ?? 0;
+      if (shin == 0) continue;
+      final thighRise = pose.heightAbove(side.hip, side.knee, shin);
+      final shinRise = pose.heightAbove(side.knee, side.ankle, shin);
+      if (thighRise != null &&
+          shinRise != null &&
+          thighRise.abs() < 0.45 &&
+          shinRise > 0.75) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   ExerciseAnalysis processPose(PoseResult pose) {
     final d = _diagnostics;
@@ -207,7 +313,8 @@ class GenericHoldAnalyzer implements ExerciseAnalyzer {
     } else {
       d.framesWithBody++;
       d.observeSignal(angle);
-      if (angle < spec.minAngle || angle > spec.maxAngle) {
+      if ((angle < spec.minAngle || angle > spec.maxAngle) &&
+          !_kneeHoldShape(pose)) {
         _formStatus = FormStatus.notInPosition;
         _lastFrameAt = null;
       } else {

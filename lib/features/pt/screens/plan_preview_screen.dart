@@ -55,18 +55,19 @@ class PlanPreviewScreen extends ConsumerWidget {
                     [
                           TrainerBubble(text: plan.rationale),
                           const SizedBox(height: 14),
-                          Row(
+                          // Wraps onto a second line on narrow phones.
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
                             children: [
                               _Fact(
                                 icon: Icons.schedule_rounded,
                                 text: '≈ $minutes min',
                               ),
-                              const SizedBox(width: 8),
                               _Fact(
                                 icon: Icons.format_list_numbered_rounded,
                                 text: '${plan.all.length} movements',
                               ),
-                              const SizedBox(width: 8),
                               _Fact(
                                 icon: Icons.videocam_outlined,
                                 text:

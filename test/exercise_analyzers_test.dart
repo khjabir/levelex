@@ -96,7 +96,8 @@ void main() {
       );
       final d = Driver(a);
       d.settle(Body.pushUp(165));
-      d.phase(Body.pushUp(130));
+      // Elbows to 120°: the shoulders come only an eighth of the way down.
+      d.phase(Body.pushUp(120));
       expect(d.last!.phase, CyclePhase.rest);
       var event = false;
       for (var i = 0; i < 4; i++) {

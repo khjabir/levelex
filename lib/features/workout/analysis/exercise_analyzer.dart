@@ -261,7 +261,9 @@ abstract class CycleExerciseAnalyzer implements ExerciseAnalyzer {
     final side = chooseSide(pose);
     if (quality != TrackQuality.stable || side == null) {
       if (quality == TrackQuality.jumped) d.trackBreaks++;
-      counter.invalidate();
+      // A short dropout keeps the rep in progress; a long one (or a jump to
+      // what may be another person, after the gap) starts over.
+      counter.hold(pose.timestamp);
       _formStatus = switch (quality) {
         TrackQuality.jumped => FormStatus.lowConfidence,
         _ => FormStatus.bodyNotVisible,

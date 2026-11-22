@@ -43,16 +43,20 @@ class PtHomeScreen extends ConsumerWidget {
           children: [
             const TrainerAvatar(size: 32),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('MY PT'),
-                Text(
-                  'AI-assisted personal trainer · on-device',
-                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
-                ),
-              ],
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('MY PT', maxLines: 1),
+                  Text(
+                    'AI-assisted personal trainer · on-device',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -119,7 +123,14 @@ class PtHomeScreen extends ConsumerWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       mainAxisSpacing: 10,
                       crossAxisSpacing: 10,
-                      childAspectRatio: 1.9,
+                      // Taller cards as the text grows, so the description
+                      // never clips (1.9 clipped even at the default size
+                      // on a 360 dp phone).
+                      childAspectRatio:
+                          1.55 /
+                          MediaQuery.textScalerOf(context)
+                              .scale(1)
+                              .clamp(1.0, 2.0),
                       children: [
                         for (final mode in WorkoutMode.values)
                           _ModeCard(
@@ -387,6 +398,7 @@ class _Choice extends StatelessWidget {
       selected: selected,
       label: label,
       excludeSemantics: true,
+      onTap: onTap,
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
@@ -442,6 +454,7 @@ class _ModeCard extends StatelessWidget {
       selected: selected,
       label: '${mode.label}: ${mode.description}',
       excludeSemantics: true,
+      onTap: onTap,
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
@@ -474,6 +487,8 @@ class _ModeCard extends StatelessWidget {
                   children: [
                     Text(
                       mode.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: selected

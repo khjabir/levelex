@@ -7,6 +7,7 @@ import '../../models/workout_session.dart';
 import '../levels/level_system.dart';
 import '../utils/date_utils.dart';
 import '../utils/stats_calculator.dart';
+import 'daily_challenge.dart';
 
 /// How hard a badge is to earn.
 enum AchievementTier {
@@ -640,9 +641,12 @@ class _Evaluator {
       sessions,
       ptRecords: ptRecords,
     );
+    // Rest days bridge a streak here exactly as on the home screen, so a
+    // Mon-Fri trainer with weekend rest days can reach the 7-day badge.
     final longest = StatsCalculator.longestStreak(
       sessions,
       ptRecords: ptRecords,
+      restWeekdays: input.restWeekdays,
     );
     for (final id in const [
       'streak_3',
@@ -650,7 +654,10 @@ class _Evaluator {
       'streak_30',
       'streak_100',
     ]) {
-      out[id] = _Result(longest, _streakReachedAt(activeDays, _target(id)));
+      out[id] = _Result(
+        longest,
+        _streakReachedAt(activeDays, _target(id), input.restWeekdays),
+      );
     }
     out['weeks_4'] = _weeks(
       activeDays,
@@ -710,13 +717,25 @@ class _Evaluator {
     out['marathon'] = _Result(marathon.current ~/ 60, marathon.earnedAt);
 
     // Levels: replay XP in time order to date the level-up.
+    // The daily-challenge bonus counts, as it does for the level shown on
+    // the home screen; leaving it out kept "Reach level 5" locked at level 5.
+    final challengeDays = {
+      for (final d in input.dailyChallengeDays) AppDateUtils.dateOnly(d),
+    };
     final xp = _Tally([
       for (final s in sessions)
         _Event(_finished(s), LevelSystem.xpForSession(s)),
       for (final r in ptRecords)
         _Event(r.endTime, LevelSystem.xpForPtRecord(r)),
+      for (final d in challengeDays)
+        _Event(
+          AppDateUtils.addDays(d, 1).subtract(const Duration(seconds: 1)),
+          DailyChallenges.bonusXp({d}),
+        ),
     ]);
-    final totalXp = LevelSystem.totalXp(sessions, ptRecords: ptRecords);
+    final totalXp =
+        LevelSystem.totalXp(sessions, ptRecords: ptRecords) +
+        DailyChallenges.bonusXp(challengeDays);
     // Level 1 is the floor, so no XP shows as no progress.
     final level = totalXp > 0 ? LevelSystem.levelFor(totalXp).level : 0;
     for (final id in const ['level_5', 'level_10']) {
@@ -747,7 +766,10 @@ class _Evaluator {
 
     // Personal records and the heaviest work set.
     final prs = _Tally([
-      for (final r in RecordBook.recent(lifts, limit: 1000)) _Event(r.date, 1),
+      // Only records that beat something: a lift's first log is its
+      // baseline, and counting those earned "Record Breaker" on day one.
+      for (final r in RecordBook.recent(lifts, limit: 1000))
+        if (r.previous != null) _Event(r.date, 1),
     ]);
     for (final id in const ['pr_1', 'pr_10']) {
       out[id] = prs.result(_target(id));
@@ -794,18 +816,36 @@ class _Evaluator {
 
   /// The first day on which a run of consecutive active days reached
   /// [target], or null.
-  static DateTime? _streakReachedAt(Set<DateTime> days, int target) {
+  static DateTime? _streakReachedAt(
+    Set<DateTime> days,
+    int target, [
+    Set<int> restWeekdays = const {},
+  ]) {
     final sorted = days.toList()..sort();
     var run = 0;
     DateTime? previous;
     for (final day in sorted) {
-      run = previous != null && AppDateUtils.daysBetween(previous, day) == 1
+      run = previous != null && _bridged(previous, day, restWeekdays)
           ? run + 1
           : 1;
       if (run >= target) return day;
       previous = day;
     }
     return null;
+  }
+
+  /// Whether [to] continues a run from [from]: the next day, or only rest
+  /// weekdays in between.
+  static bool _bridged(DateTime from, DateTime to, Set<int> restWeekdays) {
+    final gap = AppDateUtils.daysBetween(from, to);
+    if (gap <= 1) return gap == 1;
+    if (gap > DateTime.daysPerWeek) return false;
+    for (var i = 1; i < gap; i++) {
+      if (!restWeekdays.contains(AppDateUtils.addDays(from, i).weekday)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// The longest run of consecutive Monday-based weeks with at least [goal]

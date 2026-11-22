@@ -20,9 +20,14 @@ class MannequinPainter extends CustomPainter {
     this.tint = AppColors.primary,
     this.emphasis = const {},
     this.frame,
+    this.offset = Vec3.zero,
   });
 
   final RigPose pose;
+
+  /// Horizontal translation keeping planted hands and feet in place
+  /// (see [MannequinClip.offsetAt]).
+  final Vec3 offset;
   final double yaw;
   final double pitch;
   final Set<String> highlight;
@@ -44,7 +49,9 @@ class MannequinPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final joints = Rig.solve(pose);
+    final joints = {
+      for (final e in Rig.solve(pose).entries) e.key: e.value + offset,
+    };
     final fit = frame ?? MannequinFrame.ofPoses([pose]);
     final target = Vec3(0, fit.height * 0.5, 0);
     final view = Mat3.rotX(pitch) * Mat3.rotY(-yaw);
@@ -301,7 +308,11 @@ class MannequinPainter extends CustomPainter {
       old.pitch != pitch ||
       old.highlight != highlight ||
       old.tint != tint ||
-      old.emphasis != emphasis;
+      old.emphasis != emphasis ||
+      old.offset != offset ||
+      old.showFloor != showFloor ||
+      old.compact != compact ||
+      old.frame != frame;
 }
 
 enum _Kind { capsule, quad, head }

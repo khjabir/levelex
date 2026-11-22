@@ -22,6 +22,7 @@ import '../../widgets/share_card.dart';
 import '../../widgets/share_sheet.dart';
 import '../engagement/engagement_providers.dart';
 import 'workout_controller.dart';
+import 'workout_launch.dart';
 
 /// After a set: celebration, count, XP and level progress, coach's notes.
 class WorkoutCompleteScreen extends ConsumerWidget {
@@ -74,7 +75,7 @@ class WorkoutCompleteScreen extends ConsumerWidget {
     final partIndex = challenge.challenge.parts.indexWhere(
       (p) => p.exercise == exercise,
     );
-    final newBadges = ref.watch(newAchievementsProvider);
+    final newBadges = ref.watch(newBadgesShownProvider(session.id));
     if (newBadges.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) ref.read(markAchievementsSeenProvider)();
@@ -425,8 +426,19 @@ class WorkoutCompleteScreen extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () =>
-                                  context.pushReplacement(Routes.workoutCamera),
+                              onPressed: () {
+                                // Same exercise and target as this set (a
+                                // daily-challenge squat set stays squats).
+                                ref
+                                    .read(workoutLaunchProvider.notifier)
+                                    .set(
+                                      WorkoutLaunch(
+                                        exercise: exercise,
+                                        target: session.targetReps,
+                                      ),
+                                    );
+                                context.pushReplacement(Routes.workoutCamera);
+                              },
                               icon: const Icon(Icons.replay_rounded),
                               label: const Text('ANOTHER SET'),
                             ),

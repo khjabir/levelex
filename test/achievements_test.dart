@@ -386,13 +386,21 @@ void main() {
         ]),
       ];
       final statuses = evaluate(lifts: lifts);
+      // The first log is the baseline; the second beats it (weight, 1RM
+      // and volume), which is the first real record.
       final first = find(statuses, 'pr_1');
       expect(first.earned, isTrue);
-      expect(first.earnedAt, DateTime(2026, 3, 1, 10));
+      expect(first.earnedAt, DateTime(2026, 3, 8, 10));
       final ten = find(statuses, 'pr_10');
       expect(ten.earned, isFalse);
-      expect(ten.current, RecordBook.recent(lifts, limit: 1000).length);
-      expect(ten.current, 6);
+      expect(
+        ten.current,
+        RecordBook.recent(
+          lifts,
+          limit: 1000,
+        ).where((r) => r.previous != null).length,
+      );
+      expect(ten.current, 3);
     });
 
     test('heavy_100 needs a 100 kg work set', () {
@@ -568,6 +576,10 @@ void main() {
         lifts: [
           lift('a', DateTime(2026, 3, 1, 10), const [
             LiftSet(weightKg: 60, reps: 5),
+          ]),
+          // Beats the baseline above: the first real record.
+          lift('b', DateTime(2026, 3, 4, 10), const [
+            LiftSet(weightKg: 65, reps: 5),
           ]),
         ],
         challenges: [challenge(DateTime(2026, 3, 5, 19))],

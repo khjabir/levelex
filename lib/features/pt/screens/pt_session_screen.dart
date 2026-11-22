@@ -64,7 +64,12 @@ class _PtSessionScreenState extends ConsumerState<PtSessionScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
-    if (state != AppLifecycleState.resumed) {
+    // `inactive` is a system dialog (the camera permission prompt), the
+    // notification shade or a call banner: the app is still on screen, so
+    // only a real move to the background pauses the session.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
       ref.read(ptSessionProvider.notifier).onAppBackgrounded();
     }
   }
@@ -76,7 +81,8 @@ class _PtSessionScreenState extends ConsumerState<PtSessionScreen>
       context.go(Routes.pt);
       return;
     }
-    if (!state.paused) await controller.pause();
+    final wasPaused = state.paused;
+    if (!wasPaused) await controller.pause();
     if (!mounted) return;
     final end = await showDialog<bool>(
       context: context,
@@ -100,7 +106,8 @@ class _PtSessionScreenState extends ConsumerState<PtSessionScreen>
     if (!mounted) return;
     if (end == true) {
       await controller.finish();
-    } else {
+    } else if (!wasPaused) {
+      // Only undo the pause this dialog made, not one the user chose.
       await controller.resume();
     }
   }
@@ -1343,7 +1350,9 @@ class _SummaryView extends ConsumerWidget {
     final done = record?.itemsDone ?? 0;
     final total = record?.itemCount ?? 0;
     final complete = record != null && record.completion >= 0.8;
-    final newBadges = ref.watch(newAchievementsProvider);
+    final newBadges = ref.watch(
+      newBadgesShownProvider(record?.id ?? 'pt-summary'),
+    );
     if (newBadges.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) ref.read(markAchievementsSeenProvider)();

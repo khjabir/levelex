@@ -172,8 +172,21 @@ class _OnboardingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Centred when it fits, scrollable on short phones or large text.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: _page(theme),
+        ),
+      ),
+    );
+  }
+
+  Widget _page(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.zero,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children:

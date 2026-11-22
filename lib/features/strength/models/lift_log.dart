@@ -189,14 +189,20 @@ class BodyWeightEntry {
 
   Map<String, dynamic> toMap() => {
     'date': date.millisecondsSinceEpoch,
+    // The calendar day itself: re-deriving it from the instant in another
+    // time zone moved the entry to the previous day, so it could not be
+    // deleted (its storage key is this day) and the day could be logged
+    // twice.
+    'day': key,
     'kg': kg,
     if (note != null) 'note': note,
   };
 
   factory BodyWeightEntry.fromMap(Map<dynamic, dynamic> map) {
-    final raw = DateTime.fromMillisecondsSinceEpoch(
-      (map['date'] as num).toInt(),
-    );
+    final day = DateTime.tryParse('${map['day'] ?? ''}');
+    final raw =
+        day ??
+        DateTime.fromMillisecondsSinceEpoch((map['date'] as num).toInt());
     return BodyWeightEntry(
       date: DateTime(raw.year, raw.month, raw.day),
       kg: (map['kg'] as num).toDouble(),

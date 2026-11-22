@@ -24,6 +24,7 @@ class BodyTracker {
   BodyTracker({
     this.presenceConfidence = 0.3,
     this.maxJumpRatio = 0.8,
+    this.maxSpeedRatio = 7.0,
     this.maxGap = const Duration(milliseconds: 700),
     this.minTorsoLength = 0.06,
     this.stableFramesRequired = 3,
@@ -32,9 +33,14 @@ class BodyTracker {
   /// Likelihood below which a landmark is treated as absent.
   final double presenceConfidence;
 
-  /// Centre displacement between consecutive frames, as a fraction of the
-  /// torso length, above which the track is considered broken.
+  /// Centre displacement allowed between back-to-back frames, as a fraction
+  /// of the body size, before the track is considered broken.
   final double maxJumpRatio;
+
+  /// Extra displacement allowed per second of gap (body sizes per second),
+  /// so a dropped frame during a burpee or a jump is not mistaken for a
+  /// different person.
+  final double maxSpeedRatio;
 
   /// Longer gaps between frames restart continuity without penalty.
   final Duration maxGap;
@@ -51,6 +57,10 @@ class BodyTracker {
   int _stableFrames = 0;
   int _breaks = 0;
 
+  /// Stability earned before a frame without a body, restored when the same
+  /// body reappears in the same place within [maxGap].
+  int _stableBeforeGap = 0;
+
   int get stableFrames => _stableFrames;
   int get breaks => _breaks;
   bool get isStable => _stableFrames >= stableFramesRequired;
@@ -60,13 +70,20 @@ class BodyTracker {
     _lastAt = null;
     _scale = null;
     _stableFrames = 0;
+    _stableBeforeGap = 0;
+  }
+
+  void _lose() {
+    if (_stableFrames > 0) _stableBeforeGap = _stableFrames;
+    _stableFrames = 0;
   }
 
   TrackQuality update(PoseResult pose) {
     final torso = _torso(pose);
     if (torso == null) {
-      _stableFrames = 0;
-      _lastCenter = null;
+      // Keep the last position: a body that reappears where it was a moment
+      // ago is the same body and need not warm up again.
+      _lose();
       return TrackQuality.missing;
     }
     final (center, torsoLength, shoulderWidth, extent) = torso;
@@ -79,8 +96,7 @@ class BodyTracker {
       extent * 0.5,
     ].reduce((a, b) => a > b ? a : b);
     if (size < minTorsoLength) {
-      _stableFrames = 0;
-      _lastCenter = null;
+      _lose();
       return TrackQuality.implausible;
     }
     // Smoothed over time so normal movement never looks like a jump.
@@ -91,19 +107,27 @@ class BodyTracker {
     final lastAt = _lastAt;
     _lastCenter = center;
     _lastAt = pose.timestamp;
-    if (last != null &&
-        lastAt != null &&
-        pose.timestamp.difference(lastAt) <= maxGap) {
+    final gap = lastAt == null ? null : pose.timestamp.difference(lastAt);
+    if (last != null && gap != null && gap <= maxGap) {
       final jump = Geometry.distance(center, last);
-      if (jump > maxJumpRatio * _scale!) {
+      final allowed =
+          _scale! *
+          (maxJumpRatio + maxSpeedRatio * gap.inMilliseconds / 1000 * 0.5);
+      if (jump > allowed) {
         _stableFrames = 0;
+        _stableBeforeGap = 0;
         _breaks++;
         return TrackQuality.jumped;
+      }
+      if (_stableFrames == 0 && _stableBeforeGap > 0) {
+        // Same body, same place, after a short gap: resume where it was.
+        _stableFrames = _stableBeforeGap;
       }
     } else if (last != null) {
       // Long gap: start counting stability again, silently.
       _stableFrames = 0;
     }
+    _stableBeforeGap = 0;
     _stableFrames++;
     return TrackQuality.stable;
   }

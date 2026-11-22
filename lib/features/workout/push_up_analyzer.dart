@@ -5,16 +5,20 @@ import '../../models/form_status.dart';
 import '../../models/pose_result.dart';
 import 'analysis/exercise_analyzer.dart';
 import 'analysis/rep_cycle_counter.dart';
+import 'analysis/signals.dart';
 
 export 'analysis/exercise_analyzer.dart';
 export 'analysis/rep_cycle_counter.dart' show CyclePhase, CycleRejection;
 
 /// Push-up counter.
 ///
-/// Signal: elbow angle averaged over the trackable arms, measured in the
-/// image plane unless the arm points at the camera (then depth is used).
-/// Rest = arms extended, work = arms bent. Thresholds adapt to the user's
-/// range of motion.
+/// Signal: how high the shoulders are above the hands, as a fraction of
+/// that height at the top of the rep (1 = arms straight, ~0.35 = chest at
+/// the floor). Unlike the elbow angle, this reads the same with the phone at
+/// the side, in front of the head or on a diagonal: from the front the
+/// elbows bend towards the camera where a 2D angle cannot see it. Rest =
+/// near the top, work = below [PushUpThresholds.pushUpDropRatio]; the
+/// thresholds adapt to the user's own range of motion within limits.
 ///
 /// A descent is accepted only when the shoulders actually moved since the
 /// last rest frame and the hands did not swing far more than the shoulders
@@ -25,17 +29,22 @@ class PushUpAnalyzer extends CycleExerciseAnalyzer {
     : super(
         target: targetReps,
         cycle: CycleConfig(
-          restDefault: thresholds.upAngle,
-          workDefault: thresholds.downAngle,
-          minRange: thresholds.adaptiveMinRange,
+          restDefault: 0.92,
+          workDefault: thresholds.pushUpDropRatio,
+          minRange: 0.15,
           margin: thresholds.adaptiveMargin,
           adaptive: thresholds.adaptiveThresholds,
+          minGap: 0.06,
+          decayPerFrame: 0.0015,
+          maxAdaptiveLoosening: 0.06,
           minFrames: thresholds.minFramesForTransition,
           minWorkDuration: thresholds.minRepDuration,
           cooldown: thresholds.repCooldown,
           shallowFraction: thresholds.shallowFraction,
         ),
       );
+
+  final DropRatio _drop = DropRatio();
 
   Vec3? _shoulderAtRest;
   Vec3? _wristAtRest;
@@ -63,15 +72,31 @@ class PushUpAnalyzer extends CycleExerciseAnalyzer {
   @override
   double? signal(PoseResult pose) {
     final arms = _arms(pose);
+    if (arms.isEmpty) return null;
+    final h = pose.heightBetween(
+      arms.map((s) => s.shoulder),
+      arms.map((s) => s.wrist),
+    );
+    return _drop.update(h, pose.timestamp);
+  }
+
+  /// Mean elbow angle of the trackable arms (for the coach and the report).
+  double? elbowAngle(PoseResult pose) {
     var sum = 0.0;
     var n = 0;
-    for (final side in arms) {
+    for (final side in _arms(pose)) {
       final a = pose.elbowAngle(side);
       if (a == null) continue;
       sum += a;
       n++;
     }
     return n == 0 ? null : sum / n;
+  }
+
+  @override
+  void reset() {
+    super.reset();
+    _drop.reset();
   }
 
   @override

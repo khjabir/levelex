@@ -364,7 +364,8 @@ class _DayDetailSheet extends ConsumerWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 1.9,
+            childAspectRatio:
+                1.9 / MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.2),
             children: [
               _DetailStat(
                 label: 'Total reps',
@@ -447,14 +448,23 @@ class _DetailStat extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              value,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: color ?? AppColors.textPrimary,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color ?? AppColors.textPrimary,
+                ),
               ),
             ),
-            Text(label, style: theme.textTheme.bodySmall),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
           ],
         ),
       ),

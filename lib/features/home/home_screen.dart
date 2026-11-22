@@ -27,6 +27,7 @@ import '../strength/logic/routine_schedule.dart';
 import '../strength/models/routine.dart';
 import '../strength/strength_providers.dart';
 import '../workout/exercise_icons.dart';
+import '../workout/workout_launch.dart';
 import '../pt/figure/guide_3d.dart';
 
 /// Dashboard: level and XP, today's goal ring, exercise picker, the START
@@ -211,7 +212,10 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
                         TextButton(
-                          onPressed: () => context.push(Routes.workout),
+                          onPressed: () {
+                            ref.read(workoutLaunchProvider.notifier).clear();
+                            context.push(Routes.workout);
+                          },
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
                             minimumSize: const Size(0, 36),
@@ -226,7 +230,12 @@ class HomeScreen extends ConsumerWidget {
                       label: selected.startLabel,
                       icon: Icons.play_arrow_rounded,
                       semanticLabel: 'Start ${selected.singular} set',
-                      onPressed: () => context.push(Routes.workout),
+                      onPressed: () {
+                        // A plain START is the selected exercise, never a
+                        // challenge or "beat it" set abandoned earlier.
+                        ref.read(workoutLaunchProvider.notifier).clear();
+                        context.push(Routes.workout);
+                      },
                     ),
                     const SizedBox(height: 28),
                     const SectionHeader("Today's sessions"),
@@ -584,9 +593,12 @@ class _LevelCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '${level.xpToNext} XP to level ${level.level + 1}',
-                style: theme.textTheme.bodySmall,
+              Flexible(
+                child: Text(
+                  '${level.xpToNext} XP to level ${level.level + 1}',
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodySmall,
+                ),
               ),
             ],
           ),
@@ -866,6 +878,7 @@ class _ExercisePicker extends StatelessWidget {
             selected: isSelected,
             label: type.label,
             excludeSemantics: true,
+            onTap: () => onSelected(type),
             child: GestureDetector(
               onTap: () => onSelected(type),
               child: AnimatedContainer(

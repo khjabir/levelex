@@ -382,7 +382,10 @@ class _IntervalsScreenState extends ConsumerState<IntervalsScreen> {
 
   Future<void> _addMovement() async {
     final id = await context.push<String>(Routes.libraryPick);
-    if (id != null && mounted) setState(() => _movements.add(id));
+    // Only library movements can run as intervals (an unknown id would sit
+    // hidden in the list and shift the remove buttons).
+    if (id == null || !mounted || MovementLibrary.byId(id) == null) return;
+    setState(() => _movements.add(id));
   }
 
   void _start(List<Movement> movements) {

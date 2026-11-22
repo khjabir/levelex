@@ -72,26 +72,31 @@ class BadgeTile extends StatelessWidget {
     final clamped = progress.isNaN ? 0.0 : progress.clamp(0.0, 1.0);
     final iconData = iconFor(icon);
 
+    final badge = earned
+        ? _EarnedBadge(icon: iconData, size: size, ring: tierColor(tier))
+        : _LockedBadge(icon: iconData, size: size, progress: clamped);
+    // Without a title or subtitle the tile is just the badge: the empty
+    // title line and its gap made icon-only uses overflow their box.
+    final iconOnly = title.isEmpty && subtitle == null;
     final column = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        earned
-            ? _EarnedBadge(icon: iconData, size: size, ring: tierColor(tier))
-            : _LockedBadge(icon: iconData, size: size, progress: clamped),
-        SizedBox(height: large ? 12 : 8),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: AppTheme.fontFamily,
-            fontSize: large ? 14 : 12,
-            fontWeight: FontWeight.w700,
-            height: 1.2,
-            color: earned ? AppColors.textPrimary : AppColors.textSecondary,
+        badge,
+        if (!iconOnly) SizedBox(height: large ? 12 : 8),
+        if (!iconOnly)
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: AppTheme.fontFamily,
+              fontSize: large ? 14 : 12,
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+              color: earned ? AppColors.textPrimary : AppColors.textSecondary,
+            ),
           ),
-        ),
         if (subtitle != null) ...[
           const SizedBox(height: 2),
           Text(
@@ -111,10 +116,12 @@ class BadgeTile extends StatelessWidget {
     );
 
     Widget body = Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: large ? 12 : 6,
-        vertical: large ? 12 : 8,
-      ),
+      padding: iconOnly
+          ? EdgeInsets.zero
+          : EdgeInsets.symmetric(
+              horizontal: large ? 12 : 6,
+              vertical: large ? 12 : 8,
+            ),
       child: column,
     );
     if (onTap != null) {
@@ -135,6 +142,7 @@ class BadgeTile extends StatelessWidget {
       label: label,
       button: onTap != null,
       excludeSemantics: true,
+      onTap: onTap,
       child: body,
     );
   }

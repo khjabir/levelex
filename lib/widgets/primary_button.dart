@@ -34,11 +34,15 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // The node replaces the children's semantics, so it must carry the tap
+    // itself: without it screen readers and switch access could focus the
+    // button but not press it.
     return Semantics(
       button: true,
       enabled: _enabled,
       label: widget.semanticLabel ?? widget.label,
       excludeSemantics: true,
+      onTap: _enabled ? widget.onPressed : null,
       child: GestureDetector(
         onTapDown: _enabled ? (_) => setState(() => _pressed = true) : null,
         onTapCancel: () => setState(() => _pressed = false),

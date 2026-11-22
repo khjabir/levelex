@@ -1,3 +1,4 @@
+import '../../../core/utils/geometry.dart';
 import 'rig.dart';
 
 /// Keyframe library for every movement in the catalogue.
@@ -35,7 +36,9 @@ abstract final class MannequinClips {
     hipAbd: hipAbd,
   );
 
-  /// Lying on the back with the knees bent and feet flat.
+  /// Lying on the back with the knees bent and feet flat. The thighs keep
+  /// their angle to the floor whatever the torso does (sit-ups, crunches),
+  /// so the feet stay planted.
   static RigPose lying({
     double arms = 40,
     double elbow = 110,
@@ -45,12 +48,33 @@ abstract final class MannequinClips {
   }) => RigPose.sym(
     bodyPitch: torso,
     hipFlex: 135 + torso,
-    knee: 85,
+    knee: _lyingKnee,
     shoulderFlex: arms,
     elbow: elbow,
     shoulderAbd: abd,
     armRot: armRot,
   );
+
+  /// Knee bend that puts the feet flat on the floor when lying with the
+  /// thighs at 45° (a fixed 85° left the feet hovering 26 cm up).
+  static final double _lyingKnee = () {
+    double gap(double knee) {
+      final j = Rig.solve(RigPose.sym(bodyPitch: -90, hipFlex: 45, knee: knee));
+      // Ankle down on the floor, level with the back (the pelvis joint
+      // sits 0.1 m up).
+      return (j['ankleL']!.y - (j['pelvis']!.y - 0.07)).abs();
+    }
+
+    var best = 85.0, bestGap = gap(85);
+    for (var k = 60.0; k <= 130; k += 0.5) {
+      final g = gap(k);
+      if (g < bestGap) {
+        bestGap = g;
+        best = k;
+      }
+    }
+    return best;
+  }();
 
   // Shared poses -------------------------------------------------------------
 
@@ -66,18 +90,87 @@ abstract final class MannequinClips {
     hipAbd: 2,
   );
 
-  /// Bottom of a push-up: elbows tucked about 45°, forearms vertical, body
-  /// still one straight line.
-  static final pushBottom = hinge(
-    lean: 76,
-    thigh: -76,
-    knee: 2,
-    arms: -72,
-    elbow: 76,
-    abd: 30,
-    neck: -32,
-    hipAbd: 2,
+  /// Bottom of a push-up: chest a hand's width off the floor, body still
+  /// one straight line pivoting on the toes, elbows tucked about 45°. The
+  /// arm angles are solved so the hands stay exactly where they were at the
+  /// top (the old pose slid the hands back half an arm's length).
+  static final pushBottom = plant(
+    reference: plankTop,
+    start: const [-72, 88, 24],
+    build: (p) => hinge(
+      lean: 81,
+      thigh: -81,
+      knee: 2,
+      arms: p[0],
+      elbow: p[1].clamp(0.0, 150.0),
+      abd: p[2].clamp(10.0, 45.0),
+      neck: -32,
+      hipAbd: 2,
+    ),
   );
+
+  /// Adjusts the pose [build] makes from parameters (degrees) so that
+  /// [joint] sits where it sits in [reference] relative to [anchor]: the
+  /// hands stay planted relative to the toes while a push-up goes down, or
+  /// on the bench while a dip goes down. Coordinate descent, a few hundred
+  /// rig solves, run once when the clips are built.
+  static RigPose plant({
+    required RigPose reference,
+    required List<double> start,
+    required RigPose Function(List<double> p) build,
+    String joint = 'wristL',
+    String anchor = 'toeL',
+  }) {
+    final ref = Rig.solve(reference);
+    return reach(
+      target: ref[joint]! - ref[anchor]!,
+      start: start,
+      build: build,
+      joint: joint,
+      anchor: anchor,
+    );
+  }
+
+  /// Adjusts the pose [build] makes from parameters (degrees) so [joint]
+  /// sits at [target] relative to [anchor]; [weights] (x, y, z) leave an
+  /// axis free when zero.
+  static RigPose reach({
+    required Vec3 target,
+    required List<double> start,
+    required RigPose Function(List<double> p) build,
+    String joint = 'wristL',
+    String anchor = 'toeL',
+    Vec3 weights = const Vec3(1, 1, 1),
+  }) {
+    double cost(List<double> p) {
+      final j = Rig.solve(build(p));
+      final d = (j[joint]! - j[anchor]!) - target;
+      return d.x * d.x * weights.x +
+          d.y * d.y * weights.y +
+          d.z * d.z * weights.z;
+    }
+
+    var p = [...start];
+    var best = cost(p);
+    var step = 8.0;
+    while (step > 0.05) {
+      var improved = false;
+      for (var k = 0; k < p.length; k++) {
+        for (final dir in const [1.0, -1.0]) {
+          final q = [...p];
+          q[k] += dir * step;
+          final c = cost(q);
+          if (c < best) {
+            best = c;
+            p = q;
+            improved = true;
+          }
+        }
+      }
+      if (!improved) step /= 2;
+    }
+    return build(p);
+  }
 
   /// Parallel squat: hips back, chest up, knees over the toes.
   static final squatBottom = hinge(
@@ -89,15 +182,65 @@ abstract final class MannequinClips {
     hipAbd: 8,
   );
 
-  /// Deep crouch with the hands on the floor (burpee, inchworm).
-  static final crouch = hinge(
-    lean: 45,
-    thigh: 85,
-    knee: 135,
-    arms: 70,
-    elbow: 10,
-    neck: -30,
-    hipAbd: 10,
+  /// Deep crouch with the hands on the floor a forearm's length in front of
+  /// the toes (burpee, inchworm). The old pose reached forward with the
+  /// hands 60 cm up, so the burpee's jump back had nothing to land on.
+  static final crouch = reach(
+    target: const Vec3(0, 0.07, 0.32),
+    weights: const Vec3(0, 1, 1),
+    start: const [50, 15],
+    build: (p) => hinge(
+      lean: p[0].clamp(25.0, 75.0),
+      thigh: 85,
+      knee: 135,
+      arms: p[1].clamp(-30.0, 80.0),
+      elbow: 10,
+      neck: -30,
+      hipAbd: 10,
+    ),
+  );
+
+  /// Top of a glute bridge: hips driven up until shoulders, hips and knees
+  /// make one line, with the shoulders and the feet still on the floor (the
+  /// old pose rotated the whole body, lifting the feet into the air).
+  static final _bridgeTop = plant(
+    reference: lying(arms: 0, elbow: 4, abd: 18),
+    joint: 'toeL',
+    anchor: 'shoulderL',
+    start: const [-10, 100],
+    build: (p) => RigPose.sym(
+      bodyPitch: -118,
+      hipFlex: p[0].clamp(-50.0, 60.0),
+      knee: p[1].clamp(40.0, 150.0),
+      shoulderFlex: 0,
+      elbow: 4,
+      shoulderAbd: 18,
+    ),
+  );
+
+  /// Bench dip, top: arms straight behind, hands on the bench at hip
+  /// height, heels on the floor.
+  static const _dipTop = RigPose.sym(
+    bodyPitch: 5,
+    shoulderFlex: -40,
+    elbow: 8,
+    hipFlex: 85,
+    knee: 75,
+  );
+
+  /// Bench dip, bottom: upper arms back to about horizontal, forearms
+  /// vertical, hips sinking straight down; the body angles are solved so
+  /// the hands stay on the bench and the heels on the floor.
+  static final _dipBottom = plant(
+    reference: _dipTop,
+    start: const [5, 85, 75],
+    build: (p) => RigPose.sym(
+      bodyPitch: p[0].clamp(-5.0, 25.0),
+      shoulderFlex: -88,
+      elbow: 92,
+      hipFlex: p[1].clamp(40.0, 130.0),
+      knee: p[2].clamp(20.0, 130.0),
+    ),
   );
 
   /// Hip hinge with a flat back and soft knees (deadlift, RDL, rows).
@@ -298,17 +441,15 @@ abstract final class MannequinClips {
     ),
     MannequinClip(
       id: 'glute_bridge',
-      frames: [
-        lying(arms: 0, elbow: 4, abd: 18),
-        lying(arms: 0, elbow: 4, abd: 18, torso: -118),
-      ],
+      frames: [lying(arms: 0, elbow: 4, abd: 18), _bridgeTop],
       durations: const [900],
     ),
     MannequinClip(
       id: 'mountain_climbers',
       frames: [
-        plankTop.copyWith(hipFlexL: 100, kneeL: 115),
-        plankTop.copyWith(hipFlexR: 100, kneeR: 115),
+        // The driven foot hovers; the other leg stays long, toes down.
+        plankTop.copyWith(hipFlexL: 88, kneeL: 125),
+        plankTop.copyWith(hipFlexR: 88, kneeR: 125),
       ],
       durations: const [340],
     ),
@@ -405,22 +546,7 @@ abstract final class MannequinClips {
     ),
     MannequinClip(
       id: 'dip',
-      frames: [
-        const RigPose.sym(
-          bodyPitch: 5,
-          shoulderFlex: -40,
-          elbow: 8,
-          hipFlex: 85,
-          knee: 75,
-        ),
-        const RigPose.sym(
-          bodyPitch: 5,
-          shoulderFlex: -55,
-          elbow: 95,
-          hipFlex: 90,
-          knee: 75,
-        ),
-      ],
+      frames: [_dipTop, _dipBottom],
       durations: const [900],
     ),
     MannequinClip(
@@ -549,8 +675,18 @@ abstract final class MannequinClips {
     MannequinClip(
       id: 'bench_press',
       frames: [
-        lying(arms: 0, elbow: 95, abd: 72, armRot: 90).copyWith(lift: 0.4),
-        lying(arms: 92, elbow: 4).copyWith(lift: 0.4),
+        // On the bench: thighs level, shins down, feet on the floor (the
+        // feet are the lowest point, which puts the back at bench height).
+        lying(
+          arms: 0,
+          elbow: 95,
+          abd: 72,
+          armRot: 90,
+        ).copyWith(hipFlexL: 0, hipFlexR: 0, kneeL: 88, kneeR: 88),
+        lying(
+          arms: 92,
+          elbow: 4,
+        ).copyWith(hipFlexL: 0, hipFlexR: 0, kneeL: 88, kneeR: 88),
       ],
       durations: const [1000],
     ),

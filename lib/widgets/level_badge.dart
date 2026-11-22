@@ -45,27 +45,34 @@ class LevelBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'LEVEL ${info.level}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: AppColors.textMuted,
-                  letterSpacing: 1.4,
-                  fontWeight: FontWeight.w700,
+          // Flexible so large text sizes ellipsize instead of overflowing.
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'LEVEL ${info.level}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: AppColors.textMuted,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              Text(
-                info.title,
-                style:
-                    (compact
-                            ? theme.textTheme.titleSmall
-                            : theme.textTheme.titleMedium)
-                        ?.copyWith(fontWeight: FontWeight.w800),
-              ),
-            ],
+                Text(
+                  info.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      (compact
+                              ? theme.textTheme.titleSmall
+                              : theme.textTheme.titleMedium)
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
           ),
         ],
       ),

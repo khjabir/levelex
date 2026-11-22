@@ -4,6 +4,7 @@ import 'package:camera/camera.dart' show CameraLensDirection;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/constants/app_constants.dart';
@@ -148,10 +149,18 @@ class ChallengeController extends Notifier<ChallengeState> {
   DateTime? _inPositionSince;
   bool _disposed = false;
   bool _ending = false;
+  bool _savingResults = false;
+  bool _switchingCamera = false;
+  DateTime? _heldAt;
   static const _uuid = Uuid();
+
+  /// Read once: `ref` throws inside `onDispose`, which used to stop the
+  /// teardown before the camera was released.
+  late VoiceCoach _voice;
 
   @override
   ChallengeState build() {
+    _voice = ref.read(voiceCoachProvider);
     ref.onDispose(_teardown);
     final config = ref.read(challengeConfigProvider);
     final settings = ref.read(settingsProvider);
@@ -166,7 +175,11 @@ class ChallengeController extends Notifier<ChallengeState> {
     );
   }
 
-  VoiceCoach get _voice => ref.read(voiceCoachProvider);
+  Future<void> _setWakelock(bool on) async {
+    try {
+      on ? await WakelockPlus.enable() : await WakelockPlus.disable();
+    } catch (_) {}
+  }
 
   void _say(String text) {
     final settings = ref.read(settingsProvider);
@@ -253,12 +266,16 @@ class ChallengeController extends Notifier<ChallengeState> {
       phase: RoundPhase.countdown,
       countdownValue: 3,
     );
+    // A 30 s round plus getting in position outlasts many auto-locks, and
+    // the lock ended the round.
+    unawaited(_setWakelock(true));
   }
 
   void _fail(PoseDetectionException e) {
     debugPrint('Challenge camera error: $e');
     if (_disposed) return;
     _countdown?.cancel();
+    _countdown = null;
     _roundTimer?.cancel();
     state = state.copyWith(
       phase: RoundPhase.error,
@@ -266,20 +283,43 @@ class ChallengeController extends Notifier<ChallengeState> {
       cameraReady: false,
       clearPose: true,
     );
+    unawaited(_setWakelock(false));
+    unawaited(_camera?.releaseCamera());
   }
 
   Future<void> switchCamera() async {
     final c = _camera;
-    if (c == null || !state.cameraReady) return;
+    if (c == null || !state.cameraReady || _switchingCamera) return;
+    _switchingCamera = true;
+    state = state.copyWith(cameraReady: false, clearPose: true);
     try {
       await c.switchCamera();
+      if (_disposed) return;
       state = state.copyWith(
+        cameraReady: true,
         mirror: c.mirrorPreview,
         lensDirection: c.lensDirection,
       );
     } on PoseDetectionException catch (e) {
       _fail(e);
+    } finally {
+      _switchingCamera = false;
     }
+  }
+
+  /// Stops the round's clock while the player is asked whether to leave.
+  void holdRound() {
+    if (state.phase != RoundPhase.active || _heldAt != null) return;
+    _heldAt = DateTime.now();
+  }
+
+  /// Restarts the clock where [holdRound] stopped it.
+  void releaseRound() {
+    final held = _heldAt;
+    _heldAt = null;
+    final start = _roundStart;
+    if (held == null || start == null) return;
+    _roundStart = start.add(DateTime.now().difference(held));
   }
 
   void _onPose(PoseResult pose) {
@@ -306,6 +346,7 @@ class ChallengeController extends Notifier<ChallengeState> {
           _inPositionSince = null;
         }
       case RoundPhase.active:
+        if (_heldAt != null) return;
         final analysis = analyzer.processPose(pose);
         final fired = _coach.observe(analysis, pose.timestamp);
         final cue = _coach.cueAt(pose.timestamp);
@@ -380,6 +421,7 @@ class ChallengeController extends Notifier<ChallengeState> {
     _roundTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       final start = _roundStart;
       if (start == null || state.phase != RoundPhase.active) return;
+      if (_heldAt != null) return;
       final elapsed = DateTime.now().difference(start).inMilliseconds / 1000.0;
       state = state.copyWith(elapsed: elapsed);
       if (state.timed && elapsed >= state.config.value) {
@@ -411,11 +453,16 @@ class ChallengeController extends Notifier<ChallengeState> {
     final score = ChallengeScore(
       player: state.player,
       reps: state.reps,
+      // A timed round cut short (the app went to the background) shows the
+      // time it really lasted.
       seconds: state.timed
-          ? state.config.value.toDouble()
+          ? double.parse(
+              seconds.clamp(0, state.config.value).toStringAsFixed(1),
+            )
           : double.parse(seconds.toStringAsFixed(1)),
       formScore: _analyzer?.formScore,
     );
+    _heldAt = null;
     final scores = [...state.scores, score];
     unawaited(_camera?.stopStream());
     final unit = state.config.exercise.countLabel(score.reps);
@@ -451,6 +498,9 @@ class ChallengeController extends Notifier<ChallengeState> {
   }
 
   Future<void> _finish() async {
+    if (_savingResults) return;
+    _savingResults = true;
+    unawaited(_setWakelock(false));
     final ranked = ChallengeRecord.ranked(state.scores, state.config.mode);
     final record = ChallengeRecord(
       id: _uuid.v4(),
@@ -492,6 +542,7 @@ class ChallengeController extends Notifier<ChallengeState> {
   /// Same players, same rules, fresh scores.
   void rematch() {
     _ending = false;
+    _savingResults = false;
     state = ChallengeState(
       config: state.config,
       lensDirection: state.lensDirection,
@@ -503,9 +554,34 @@ class ChallengeController extends Notifier<ChallengeState> {
     if (_disposed) return;
     _countdown?.cancel();
     _countdown = null;
+    _heldAt = null;
     if (state.phase == RoundPhase.active) _endRound();
+    final wasStarting =
+        state.phase == RoundPhase.starting ||
+        state.phase == RoundPhase.countdown;
     await _camera?.releaseCamera();
-    if (!_disposed) state = state.copyWith(cameraReady: false, clearPose: true);
+    unawaited(_setWakelock(false));
+    if (_disposed) return;
+    state = state.copyWith(
+      cameraReady: false,
+      clearPose: true,
+      // Nothing reopens the camera mid-countdown: back to "ready" so the
+      // player can start again.
+      phase: wasStarting ? RoundPhase.upNext : null,
+      coachLine: wasStarting
+          ? '${state.player.name}, tap ready when you are set.'
+          : null,
+    );
+  }
+
+  /// Back from the settings app: a camera permission granted there lets
+  /// the player try again straight away.
+  Future<void> onAppResumed() async {
+    if (_disposed || state.phase != RoundPhase.error) return;
+    if (state.error?.kind != PoseDetectionErrorKind.permissionDenied) return;
+    final status = await ref.read(permissionServiceProvider).cameraStatus();
+    if (_disposed || status != CameraPermissionResult.granted) return;
+    state = state.copyWith(phase: RoundPhase.upNext, clearError: true);
   }
 
   void _teardown() {
@@ -513,6 +589,7 @@ class ChallengeController extends Notifier<ChallengeState> {
     _countdown?.cancel();
     _roundTimer?.cancel();
     unawaited(_voice.stop());
+    unawaited(_setWakelock(false));
     final c = _camera;
     _camera = null;
     _analyzer = null;

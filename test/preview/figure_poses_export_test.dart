@@ -21,12 +21,10 @@ void main() {
         'pingPong': clip.pingPong,
         'highlight': clip.highlight.toList(),
         'frames': [
-          for (final pose in clip.frames)
-            {
-              for (final e in Rig.solve(pose).entries)
-                e.key: [e.value.x, e.value.y, e.value.z],
-              ..._pelvisAxes(pose),
-            },
+          for (var i = 0; i < clip.frames.length; i++) _frame(clip, i),
+          // Loops that do not ping-pong close on a copy of the first frame,
+          // so the body returns straight to it (MannequinClip.framePosition).
+          if (clip.hasClosingKey) _frame(clip, 0),
         ],
       };
     }
@@ -50,6 +48,14 @@ void main() {
     expect(clips, isNotEmpty);
   }, skip: out == null ? 'Set FIGURE_POSES to export' : false);
 }
+
+/// Keyframe [i]'s joints, planted (hands and feet stay put between
+/// keyframes), plus the pelvis axes.
+Map<String, List<double>> _frame(MannequinClip clip, int i) => {
+  for (final e in clip.keyJoints(i).entries)
+    e.key: [e.value.x, e.value.y, e.value.z],
+  ..._pelvisAxes(clip.frames[i]),
+};
 
 /// The pelvis's own up and forward axes (world), so the body can bend its
 /// spine between the hips and the chest instead of hinging at one joint.
